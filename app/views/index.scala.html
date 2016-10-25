@@ -1,66 +1,34 @@
-@(person: Form[CreateUserForm])(len: Int)(json: Form[CreateJsonForm])(implicit messages: Messages)
+@(query: Form[CreateNearbyForm])(nearby: String)(implicit messages: Messages)
 
 @import helper._
 
-@main("User Database") {
+@main("SceneKap") {
 	<ul id="persons"></ul>
 
     <div align="center">
         <div class="title">
-            <b>User Database</b>
+            <b>SceneKap</b>
         </div>
-
-        Population: @len
-        <br><br>
     </div>
 
     <div class="container">
         <div class="row">
             <div align="center">
-                <div class="one-third column">
-                    @form(routes.UserController.addPerson()) {
-                        @inputText(person("Username"))
-                        @inputText(person("Settings"))
-                        @inputText(person("Last Logged"))
-                        @inputText(person("Password"))
+                @form(routes.NearbyController.nearbyBtn()) {
+                    @inputText(query("Latitude"))
+                    @inputText(query("Longitude"))
 
-                        <div class="buttons">
-                            <input type="submit" value="Add User"/>
-                        </div>
+                    <div class="buttons">
+                        <input type="submit" value="Go!"/>
+                    </div>
                 }
-                </div>
-
-                <div class="four columns">
-                    @form(routes.UserController.inputJSON()) {
-                        @inputText(json("JSON"))
-                        <div class="buttons">
-                            <input type="submit" value="Input JSON"/>
-                        </div>
-                    }
-                </div>
-
-                <div class="one-third column">
-                    <br><br>
-                    @form(routes.UserController.graphIt()) {
-                        <div class="buttons">
-                            <input type="submit" value="Graph It"/>
-                        </div>
-                    }
-
-                    @form(routes.UserController.descPersons()) {
-                        <div class="buttons">
-                            <input type="submit" value="View JSON"/>
-                        </div>
-                    }
-
-                    @form(routes.UserController.resetAll()) {
-                        <div class="buttons">
-                            <input type="submit" value="CLEAR ALL"/>
-                        </div>
-                    }
-                </div>
             </div>
         </div>
+    </div>
+
+    <div align="center">
+        @nearby
+        <br><br>
     </div>
 
     <br>
