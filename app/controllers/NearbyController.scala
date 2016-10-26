@@ -1,7 +1,5 @@
 package controllers
 
-import scala.concurrent.Future
-
 import play.api.mvc._
 import play.api.i18n._
 import play.api.data.Form
@@ -10,11 +8,14 @@ import play.api.data.Forms._
 import scala.concurrent.ExecutionContext
 import javax.inject._
 
+import async._
+
+/**
+  * Created by NoahKaplan on 10/25/16.
+  */
 class NearbyController @Inject()(val messagesApi: MessagesApi)
                                 (implicit ec: ExecutionContext) extends Controller with I18nSupport {
-  val testFuture : Future[String] = Future {
-    "hi"
-  }
+  val findNearby = new FindNearby(ec)
 
   val inputForm: Form[CreateNearbyForm] = Form {
     mapping(
@@ -23,15 +24,13 @@ class NearbyController @Inject()(val messagesApi: MessagesApi)
     )(CreateNearbyForm.apply)(CreateNearbyForm.unapply)
   }
 
-  def index = Action.async {
-    testFuture.map { res =>
-      Ok(views.html.index(inputForm)(res))
-    }
+  def index = Action {
+    Ok(views.html.index(inputForm)("Hi"))
   }
 
   def nearby(lat: String, long: String) = Action.async {
-    testFuture.map { res =>
-      Ok(views.html.index(inputForm)(BigDecimal(lat) + " " + BigDecimal(long)))
+    findNearby.getListDet(lat, long).map { res =>
+      Ok(views.html.index(inputForm)(res.toString))
     }
   }
 
