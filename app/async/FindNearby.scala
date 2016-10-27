@@ -14,7 +14,7 @@ class FindNearby(ecp: ExecutionContext) {
   private val GP_KEY_DET = "AIzaSyAls_qyBvY6SG919zH7S3Iy9RMBbfypRgw"
 
   type NearbyElem = (String, List[String], String, String, String)
-  type NearbyElemDet = (String, List[String], String, String, List[String], BigDecimal, String, String)
+  type NearbyElemDet = (String, List[String], String, String, List[String], BigDecimal, String, String, String)
 
   implicit val nearbyElemDetWrites = new Writes[NearbyElemDet] {
     def writes(e: NearbyElemDet) = Json.obj(
@@ -25,7 +25,8 @@ class FindNearby(ecp: ExecutionContext) {
       "reviews" -> e._5,
       "rating" -> e._6,
       "location" -> e._7,
-      "phone" -> e._8
+      "phone" -> e._8,
+      "pid" -> e._9
     )
   }
 
@@ -92,7 +93,7 @@ class FindNearby(ecp: ExecutionContext) {
   private def getDetails(e: NearbyElem): Future[NearbyElemDet] = Future {
     val photoUri = if(e._4.isEmpty) "" else "https://maps.googleapis.com/maps/api/place/photo?maxwidth=" + MAX_PHOTO_WIDTH +
       "&photoreference=" + e._4 + "&key=" + GP_KEY
-    val defaultRet = (e._1, e._2, photoUri, "", List[String](), BigDecimal(-1), e._5, "")
+    val defaultRet = (e._1, e._2, photoUri, "", List[String](), BigDecimal(-1), e._5, "", e._3)
 
     try {
       val raw = get("https://maps.googleapis.com/maps/api/place/details/json?placeid=" + e._3 + "&key=" + GP_KEY_DET)
@@ -113,8 +114,8 @@ class FindNearby(ecp: ExecutionContext) {
       }
 
       json \ "result" match {
-        case JsDefined(result) => (e._1, e._2, photoUri, getStrProp("website", result, ""), getReviews(result),
-                                   getNumProp("rating", result, -1), e._5, getStrProp("international_phone_number", result, ""))
+        case JsDefined(result) => (e._1, e._2, photoUri, getStrProp("website", result, ""), getReviews(result), getNumProp("rating", result, -1),
+                                   e._5, getStrProp("international_phone_number", result, ""), e._3)
         case _ => defaultRet
       }
     } catch {
