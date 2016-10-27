@@ -24,7 +24,7 @@ class FindNearby(ecp: ExecutionContext) {
       "website" -> e._4,
       "reviews" -> e._5,
       "rating" -> e._6,
-      "address" -> e._7,
+      "location" -> e._7,
       "phone" -> e._8
     )
   }
@@ -45,15 +45,14 @@ class FindNearby(ecp: ExecutionContext) {
 
   private def getNearby(lat: String, long: String): Future[List[NearbyElem]] = Future {
     try {
-      val radius = 1000
-      val raw = get("https://maps.googleapis.com/maps/api/place/search/json?location=" + lat + "," + long + "&radius=" + radius + "&key=" + GP_KEY)
+      val raw = get("https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=" + lat + "," + long + "&rankby=distance&key=" + GP_KEY)
       val json: JsValue = Json.parse(raw)
 
       def extractInfo(a: List[NearbyElem], e: JsValue): List[NearbyElem] = {
         val reqFields: Option[(String, String, String, List[String])] =
-          (e \ "name", e \ "place_id", e \ "vicinity", e \ "types") match {
-            case (JsDefined(JsString(n)), JsDefined(JsString(pid)), JsDefined(JsString(v)), JsDefined(JsArray(t))) =>
-              Some((n, pid, v, t.foldRight(List[String]()) {(e, a) => val JsString(str) = e; str :: a}))
+          (e \ "name", e \ "place_id", e \ "types", e \ "geometry" \ "location" \ "lat", e \ "geometry" \ "location" \ "lng") match {
+            case (JsDefined(JsString(n)), JsDefined(JsString(pid)), JsDefined(JsArray(t)), JsDefined(JsNumber(l1)), JsDefined(JsNumber(l2))) =>
+              Some((n, pid, l1 + "," + l2, t.foldRight(List[String]()) {(e, a) => val JsString(str) = e; str :: a}))
             case _ => None
           }
         val photoRef: String = e \ "photos" match {
@@ -91,7 +90,8 @@ class FindNearby(ecp: ExecutionContext) {
   }
 
   private def getDetails(e: NearbyElem): Future[NearbyElemDet] = Future {
-    val photoUri = "https://maps.googleapis.com/maps/api/place/photo?maxwidth=" + MAX_PHOTO_WIDTH + "&photoreference=" + e._4 + "&key=" + GP_KEY
+    val photoUri = if(e._4.isEmpty) "" else "https://maps.googleapis.com/maps/api/place/photo?maxwidth=" + MAX_PHOTO_WIDTH +
+      "&photoreference=" + e._4 + "&key=" + GP_KEY
     val defaultRet = (e._1, e._2, photoUri, "", List[String](), BigDecimal(-1), e._5, "")
 
     try {
