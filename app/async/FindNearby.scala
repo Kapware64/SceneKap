@@ -9,10 +9,25 @@ import play.api.libs.json._
   */
 class FindNearby(ecp: ExecutionContext) {
   implicit val ec = ecp
+  private val MAX_PHOTO_WIDTH = 400
   private val GP_KEY = "AIzaSyBuZtwpHo3XQpxPOFjALeUgazV_QxZudUU"
+  private val GP_KEY_DET = "AIzaSyAls_qyBvY6SG919zH7S3Iy9RMBbfypRgw"
 
   type NearbyElem = (String, List[String], String, String, String)
-  type NearbyElemDet = (String, List[String], String, String, List[String], Int, String)
+  type NearbyElemDet = (String, List[String], String, String, List[String], BigDecimal, String, String)
+
+  implicit val nearbyElemDetWrites = new Writes[NearbyElemDet] {
+    def writes(e: NearbyElemDet) = Json.obj(
+      "name" -> e._1,
+      "type" -> e._2.head,
+      "photo_uri" -> e._3,
+      "website" -> e._4,
+      "reviews" -> e._5,
+      "rating" -> e._6,
+      "address" -> e._7,
+      "phone" -> e._8
+    )
+  }
 
   @throws(classOf[java.io.IOException])
   @throws(classOf[java.net.SocketTimeoutException])
@@ -37,8 +52,8 @@ class FindNearby(ecp: ExecutionContext) {
       def extractInfo(a: List[NearbyElem], e: JsValue): List[NearbyElem] = {
         val reqFields: Option[(String, String, String, List[String])] =
           (e \ "name", e \ "place_id", e \ "vicinity", e \ "types") match {
-            case (JsDefined(JsString(n)), JsDefined(JsString(pid)), JsDefined(JsString(v)), JsDefined(JsArray(a))) =>
-              Some((n, pid, v, a.foldRight(List[String]()) {(e, a) => val JsString(str) = e; str :: a}))
+            case (JsDefined(JsString(n)), JsDefined(JsString(pid)), JsDefined(JsString(v)), JsDefined(JsArray(t))) =>
+              Some((n, pid, v, t.foldRight(List[String]()) {(e, a) => val JsString(str) = e; str :: a}))
             case _ => None
           }
         val photoRef: String = e \ "photos" match {
@@ -67,7 +82,7 @@ class FindNearby(ecp: ExecutionContext) {
             case Some(arr) => arr.value.foldRight(List[NearbyElem]()) {(e, a) => extractInfo(a, e)}
             case None => List[NearbyElem]()
           }
-        case undefined: JsUndefined => List[NearbyElem]()
+        case _ => List[NearbyElem]()
       }
     } catch {
       case ioe: java.io.IOException =>  List[NearbyElem]()
@@ -76,7 +91,36 @@ class FindNearby(ecp: ExecutionContext) {
   }
 
   private def getDetails(e: NearbyElem): Future[NearbyElemDet] = Future {
-    (e._1, e._2, e._4, "", List[String]("Great!"), 5, e._5)
+    val photoUri = "https://maps.googleapis.com/maps/api/place/photo?maxwidth=" + MAX_PHOTO_WIDTH + "&photoreference=" + e._4 + "&key=" + GP_KEY
+    val defaultRet = (e._1, e._2, photoUri, "", List[String](), BigDecimal(-1), e._5, "")
+
+    try {
+      val raw = get("https://maps.googleapis.com/maps/api/place/details/json?placeid=" + e._3 + "&key=" + GP_KEY_DET)
+      val json: JsValue = Json.parse(raw)
+
+      def extractInfo(a: List[String], e: JsValue): List[String] = {
+        (e \ "rating", e \ "text") match {
+          case (JsDefined(JsNumber(r)), JsDefined(JsString(s))) => r + " stars. " + s :: a
+          case _ => a
+        }
+      }
+
+      def getReviews(json: JsValue): List[String] = {
+        json \ "reviews" match {
+          case JsDefined(JsArray(r)) => r.foldRight(List[String]()) {(e, a) => extractInfo(a, e)}
+          case _ => List[String]()
+        }
+      }
+
+      json \ "result" match {
+        case JsDefined(result) => (e._1, e._2, photoUri, getStrProp("website", result, ""), getReviews(result),
+                                   getNumProp("rating", result, -1), e._5, getStrProp("international_phone_number", result, ""))
+        case _ => defaultRet
+      }
+    } catch {
+      case ioe: java.io.IOException =>  defaultRet
+      case ste: java.net.SocketTimeoutException => defaultRet
+    }
   }
 
   private def getDetailsL(l: List[NearbyElem]): Future[List[NearbyElemDet]] = {
@@ -84,13 +128,10 @@ class FindNearby(ecp: ExecutionContext) {
     Future.sequence(futures)
   }
 
-  //TODO: Get summaries system just like getDetails
-
-  def getListDet(lat: String, long: String) = {
+  def getListDet(lat: String, long: String): Future[JsValue] = {
     for {
       l <- getNearby(lat, long)
       lDet <- getDetailsL(l)
-      //lDetSum
-    } yield lDet
+    } yield Json.toJson(lDet)
   }
 }

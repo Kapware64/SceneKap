@@ -30,7 +30,7 @@ class NearbyController @Inject()(val messagesApi: MessagesApi)
 
   def nearby(lat: String, long: String) = Action.async {
     findNearby.getListDet(lat, long).map { res =>
-      Ok(views.html.index(inputForm)(res.toString))
+      Ok(res)
     }
   }
 
