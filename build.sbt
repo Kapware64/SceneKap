@@ -14,4 +14,8 @@ libraryDependencies ++= Seq(
   ws
 )
 
+libraryDependencies += "org.jsoup" % "jsoup" % "1.8.3"
+libraryDependencies += "com.syncthemall" % "boilerpipe" % "1.2.1"
+libraryDependencies += "net.sourceforge.htmlcleaner" % "htmlcleaner" % "2.16"
+
 fork in run := true
