@@ -1,4 +1,4 @@
-@(query: Form[CreateNearbyForm])(nearby: String)(implicit messages: Messages)
+@(query: Form[CreateNearbyForm])(msg: String)(implicit messages: Messages)
 
 @import helper._
 
@@ -14,7 +14,7 @@
     <div class="container">
         <div class="row">
             <div align="center">
-                @form(routes.NearbyController.nearbyBtn()) {
+                @form(routes.PlaceController.nearbyBtn()) {
                     @inputText(query("Latitude"))
                     @inputText(query("Longitude"))
 
@@ -27,7 +27,7 @@
     </div>
 
     <div align="center">
-        @nearby
+        @msg
         <br><br>
     </div>
 

@@ -21,15 +21,16 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
     def rComments = column[String]("rComments")
     def tComments = column[String]("tComments")
     def website = column[String]("website")
+    def photo_uri = column[String]("photo_uri")
     def extra = column[String]("extra")
 
-    def * = (pid, rComments, tComments, website, extra) <> ((Place.apply _).tupled, Place.unapply)
+    def * = (pid, rComments, tComments, website, photo_uri, extra) <> ((Place.apply _).tupled, Place.unapply)
   }
 
   private val places = TableQuery[PlaceTable]
 
-  def create(pid:String, rC:String, tC:String, w:String, e:String): Future[Int] = {
-    val q = places += Place(pid, rC, tC, w, e)
+  def create(pid:String, rC:String, tC:String, w:String, pUri: String, e:String): Future[Int] = {
+    val q = places += Place(pid, rC, tC, w, pUri, e)
     db.run(q)
   }
 

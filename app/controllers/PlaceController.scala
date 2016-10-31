@@ -9,13 +9,15 @@ import scala.concurrent.ExecutionContext
 import javax.inject._
 
 import async._
+import db.PlaceRepo
 
 /**
   * Created by NoahKaplan on 10/25/16.
   */
-class NearbyController @Inject()(val messagesApi: MessagesApi)
-                                (implicit ec: ExecutionContext) extends Controller with I18nSupport {
+class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
+                                 (implicit ec: ExecutionContext) extends Controller with I18nSupport {
   val findNearby = new FindNearby(ec)
+  val getSummary = new Summary(ec, repo)
 
   val inputForm: Form[CreateNearbyForm] = Form {
     mapping(
@@ -29,8 +31,14 @@ class NearbyController @Inject()(val messagesApi: MessagesApi)
   }
 
   def nearby(lat: String, long: String) = Action.async {
-    findNearby.getListDet(lat, long).map { res =>
+    findNearby.getNearbyJson(lat, long).map { res =>
       Ok(res)
+    }
+  }
+
+  def sum(pid: String, name: String) = Action.async {
+    getSummary.getSum(pid: String, name: String).map { sum =>
+      Ok(sum)
     }
   }
 

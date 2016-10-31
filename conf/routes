@@ -3,9 +3,11 @@
 # ~~~~
 
 # Home page
-GET     /                           controllers.NearbyController.index
-GET     /nearby/:lat/:long          controllers.NearbyController.nearby(lat, long)
-POST    /nearby                     controllers.NearbyController.nearbyBtn
+GET     /                           controllers.PlaceController.index
+GET     /nearby/:lat/:long          controllers.PlaceController.nearby(lat, long)
+GET     /summary/:pid/:name         controllers.PlaceController.sum(pid, name)
+
+POST    /nearby                     controllers.PlaceController.nearbyBtn
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)
