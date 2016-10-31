@@ -67,16 +67,16 @@ class FindNearby(ecp: ExecutionContext) {
             case _ => None
           }
         val photoRef: String = e \ "photos" match {
-            case JsDefined(JsArray(pArr)) =>
-              if(pArr.nonEmpty) {
-                pArr.head \ "photo_reference" match {
-                  case JsDefined(JsString(pr)) => pr
-                  case _ => ""
-                }
+          case JsDefined(JsArray(pArr)) =>
+            if(pArr.nonEmpty) {
+              pArr.head \ "photo_reference" match {
+                case JsDefined(JsString(pr)) => pr
+                case _ => ""
               }
-              else ""
-            case _ => ""
-          }
+            }
+            else ""
+          case _ => ""
+        }
 
         reqFields match {
           case Some((n, pid, v, types)) =>
@@ -125,7 +125,7 @@ class FindNearby(ecp: ExecutionContext) {
 
       json \ "result" match {
         case JsDefined(result) => (e._1, e._2, photoUri, getStrProp("website", result, ""), getReviews(result), getNumProp("rating", result, -1),
-                                   e._5, getStrProp("international_phone_number", result, ""), e._3, "")
+          e._5, getStrProp("international_phone_number", result, ""), e._3, "")
         case _ => defaultRet
       }
     } catch {
@@ -160,10 +160,23 @@ class FindNearby(ecp: ExecutionContext) {
     correctURL(loop(elements.toList), url)
   }
 
-  //TODO: Make this based upon occurances of wods in placeName and ABOUT_KEYWORDS
   private def getBetterSummary(placeName: String, sum1: String, sum2:String): String = {
-    if(sum2 != "") sum2
-    else sum1
+    def calcScore(relWords: List[String], textWords: List[String], acc: Int, mult: Int): Int = {
+      if(relWords.isEmpty) acc
+      else calcScore(relWords.tail, textWords, acc + textWords.count(_.toUpperCase == relWords.head.toUpperCase) * mult, mult)
+    }
+
+    if(sum2 == "") sum1
+    else if(sum1 == "") sum2
+    else {
+      val placeWords = placeName.split("\\s+").toList
+      val numPlaceWords = placeWords.size
+      val score1: Int = calcScore(placeWords, sum1.split("\\s+").toList, 0, 1) + calcScore(ABOUT_KEYWORDS, sum1.split("\\s+").toList, 0, numPlaceWords)
+      val score2: Int = calcScore(placeWords, sum2.split("\\s+").toList, 0, 1) + calcScore(ABOUT_KEYWORDS, sum2.split("\\s+").toList, 0, numPlaceWords)
+
+      if(score2 > score1) sum2
+      else sum1
+    }
   }
 
   private def getSum(e: NearbyElemDet): Future[NearbyElemDet] = {
