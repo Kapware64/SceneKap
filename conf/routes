@@ -4,8 +4,14 @@
 
 # Home page
 GET     /                           controllers.PlaceController.index
+GET     /getall                     controllers.PlaceController.getAll
 GET     /nearby/:lat/:long          controllers.PlaceController.nearby(lat, long)
 GET     /summary/:pid/:name         controllers.PlaceController.sum(pid, name)
+#change into getDetails, which also returns comments
+#post for a pid's comments (new comment and upvote/downvote)
+#post for pic
+#post for website
+#post for summary
 
 POST    /nearby                     controllers.PlaceController.nearbyBtn
 

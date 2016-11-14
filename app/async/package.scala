@@ -1,4 +1,6 @@
+import de.l3s.boilerpipe.extractors.KeepEverythingExtractor
 import play.api.libs.json._
+
 import scala.io
 
 /**
@@ -12,6 +14,39 @@ package object async {
   val MAX_PHOTO_WIDTH = 400
   val GP_KEY = "AIzaSyBuZtwpHo3XQpxPOFjALeUgazV_QxZudUU"
   val GP_KEY_DET = "AIzaSyAls_qyBvY6SG919zH7S3Iy9RMBbfypRgw"
+
+  def calcSumScore(placeName: String, sum: String, about: Boolean): Int = {
+    def helper(relWords: List[String], textWords: List[String], acc: Int, mult: Int): Int = {
+      if(relWords.isEmpty) acc
+      else helper(relWords.tail, textWords, acc + textWords.count(_.toUpperCase == relWords.head.toUpperCase) * mult, mult)
+    }
+
+    val placeWords = placeName.split("\\s+").toList
+    val numPlaceWords = placeWords.size
+    val aboutScore = if(about) helper(ABOUT_KEYWORDS, sum.split("\\s+").toList, 0, numPlaceWords) else 0
+    helper(placeWords, sum.split("\\s+").toList, 0, 1) + aboutScore
+  }
+
+  def calcUrlScore(placeName: String, url: String): Int = {
+    if(url.isEmpty) 0
+    else {
+      try {
+        val raw = get(url)
+        calcSumScore(placeName, KeepEverythingExtractor.INSTANCE.getText(raw), false)
+      } catch {
+        case ioe: java.io.IOException => 0
+        case ste: java.net.SocketTimeoutException => 0
+      }
+    }
+  }
+
+  //[modDate] is seconds since 1990
+  def sumModDateExp(modDateStr: String): Boolean = {
+    val curDate: Long = System.currentTimeMillis / 1000
+    val modDate = if(modDateStr.length > 0) modDateStr.toLong else 0
+    if(curDate - modDate > 2592000) true
+    else false
+  }
 
   def getStrProp(str: String, json: JsValue, default: String): String = {
     json \ str match {

@@ -10,13 +10,14 @@ import javax.inject._
 
 import async._
 import db.PlaceRepo
+import play.api.libs.json.Json
 
 /**
   * Created by NoahKaplan on 10/25/16.
   */
 class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
                                  (implicit ec: ExecutionContext) extends Controller with I18nSupport {
-  val findNearby = new FindNearby(ec)
+  val findNearby = new FindNearby(ec, repo)
   val getSummary = new Summary(ec, repo)
 
   val inputForm: Form[CreateNearbyForm] = Form {
@@ -51,6 +52,12 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
         Redirect("/nearby/" + coord.lat + "/" + coord.long)
       }
     )
+  }
+
+  def getAll = Action.async { implicit request =>
+    repo.list().map { data =>
+      Ok(Json.toJson(data))
+    }
   }
 }
 
