@@ -1,4 +1,4 @@
-@(query: Form[CreateNearbyForm])(msg: String)(implicit messages: Messages)
+@(nForm: Form[CreateNearbyForm])(detForm: Form[GetDetailsForm])(urlForm: Form[ChangeURLForm])(photoForm: Form[ChangePhotoForm])(implicit messages: Messages)
 
 @import helper._
 
@@ -14,28 +14,64 @@
     <div class="container">
         <div class="row">
             <div align="center">
-                @form(routes.PlaceController.nearbyBtn()) {
-                    @inputText(query("Latitude"))
-                    @inputText(query("Longitude"))
+                <div class="three columns">
+                    @form(routes.PlaceController.nearbyBtn()) {
+                        @inputText(nForm("Lat"))
+                        @inputText(nForm("Long"))
 
-                    <div class="buttons">
-                        <input type="submit" value="Go!"/>
-                    </div>
-                }
-                <br>
-                @form(routes.PlaceController.getAll()) {
-                    <div class="buttons">
-                        <input type="submit" value="View JSON"/>
-                    </div>
-                }
+                        <div class="buttons">
+                            <input type="submit" value="Nearby"/>
+                        </div>
+                    }
+                    <br>
+                </div>
+
+                <div class="three columns">
+                    @form(routes.PlaceController.detailsBtn()) {
+                        @inputText(detForm("ID"))
+                        @inputText(detForm("Name"))
+
+                        <div class="buttons">
+                            <input type="submit" value="Details"/>
+                        </div>
+                    }
+                    <br>
+                </div>
+
+                <div class="three columns">
+                    @form(routes.PlaceController.urlBtn()) {
+                        @inputText(urlForm("ID"))
+                        @inputText(urlForm("URL"))
+
+                        <div class="buttons">
+                            <input type="submit" value="Change Website"/>
+                        </div>
+                    }
+                    <br>
+                </div>
+
+                <div class="three columns">
+                    @form(routes.PlaceController.photoBtn()) {
+                        @inputText(photoForm("ID"))
+                        @inputText(photoForm("URL"))
+
+                        <div class="buttons">
+                            <input type="submit" value="Change Photo"/>
+                        </div>
+                    }
+                    <br>
+                </div>
             </div>
         </div>
     </div>
 
     <div align="center">
-        @msg
-        <br><br>
+        <br>
+        <br>
+        @form(routes.PlaceController.getAll()) {
+            <div class="buttons">
+                <input type="submit" value="View Data"/>
+            </div>
+        }
     </div>
-
-    <br>
 }

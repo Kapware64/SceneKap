@@ -6,7 +6,11 @@
 GET     /                           controllers.PlaceController.index
 GET     /getall                     controllers.PlaceController.getAll
 GET     /nearby/:lat/:long          controllers.PlaceController.nearby(lat, long)
-GET     /summary/:pid/:name         controllers.PlaceController.sum(pid, name)
+GET     /details/:pid/:name         controllers.PlaceController.details(pid, name)
+
+POST    /website/:pid/:url          controllers.PlaceController.changeWebsite(pid, url)
+POST    /photo/:pid/:url            controllers.PlaceController.changePhoto(pid, url)
+
 #change into getDetails, which also returns comments
 #post for a pid's comments (new comment and upvote/downvote)
 #post for pic
@@ -14,6 +18,9 @@ GET     /summary/:pid/:name         controllers.PlaceController.sum(pid, name)
 #post for summary
 
 POST    /nearby                     controllers.PlaceController.nearbyBtn
+POST    /details                    controllers.PlaceController.detailsBtn
+POST    /changeUrl                  controllers.PlaceController.urlBtn
+POST    /changePhoto                controllers.PlaceController.photoBtn
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)

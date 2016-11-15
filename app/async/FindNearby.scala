@@ -41,7 +41,7 @@ class FindNearby(ecp: ExecutionContext, repo: PlaceRepo) {
           case JsDefined(JsArray(pArr)) =>
             if (pArr.nonEmpty) {
               pArr.head \ "photo_reference" match {
-                case JsDefined(JsString(pr)) => pr
+                case JsDefined(JsString(pr)) => "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=" + pr + "&key=" + GP_KEY
                 case _ => ""
               }
             }
@@ -82,7 +82,7 @@ class FindNearby(ecp: ExecutionContext, repo: PlaceRepo) {
       else {
         val (lH, pH) = (l.head, p.head)
         if(lH._1 == pH.pid) helper(changeUri(lH, pH) :: acc, l.tail, p.tail)
-        else helper(acc, l.tail, p)
+        else helper(lH :: acc, l.tail, p)
       }
     }
 

@@ -13,14 +13,25 @@ import models.Place
 /**
   * Created by NoahKaplan on 10/25/16.
   */
-class Summary(ecp: ExecutionContext, repo: PlaceRepo) {
+class Details(ecp: ExecutionContext, repo: PlaceRepo) {
   implicit val ec = ecp
 
-  private def getDBInfo(pid: String): Future[(String, String, String)] = {
-    def procRes(res: Option[Place]): (String, String, String) = {
+  type Details = (String, String, String)
+
+  implicit val nearbyElemDetWrites = new Writes[Details] {
+    def writes(e: Details) = Json.obj(
+      "summary" -> e._1,
+      "rComments" -> e._2,
+      "tComments" -> e._3
+    )
+  }
+
+  //TODO: When migrating to MongoDB, the comment type should be List[Comment] where Comment is defined as (id: Int, votes: Int, date: String, text: String).
+  private def getDBInfo(pid: String): Future[(String, String, String, String, String)] = {
+    def procRes(res: Option[Place]): (String, String, String, String, String) = {
       res match {
-        case Some(p) => (p.website, p.summary, p.last_summary_mod)
-        case None => ("", "", "")
+        case Some(p) => (p.website, p.summary, p.last_summary_mod, p.rComments, p.tComments)
+        case None => ("", "", "", "", "")
       }
     }
 
@@ -86,7 +97,7 @@ class Summary(ecp: ExecutionContext, repo: PlaceRepo) {
     repo.upsertSummary(pid, summary)
   }
 
-  def getSum(pid: String, name: String): Future[String] = {
+  def getDetailsJson(pid: String, name: String): Future[JsValue] = {
     def helper(url: String, pSum: String, base: Boolean): Future[(String, String)] = Future {
       def failRet(base: Boolean) = if(base) ("", "") else (pSum, "")
 
@@ -95,8 +106,8 @@ class Summary(ecp: ExecutionContext, repo: PlaceRepo) {
         try {
           val raw = get(url)
 
-          if(base) (ArticleSentencesExtractor.INSTANCE.getText(raw), getAboutLink(raw, url))
-          else (getBetterSummary(name, pSum, ArticleSentencesExtractor.INSTANCE.getText(raw)), "")
+          if(base) (ArticleSentencesExtractor.INSTANCE.getText(raw).replaceAll("\\s+", " "), getAboutLink(raw, url))
+          else (getBetterSummary(name, pSum, ArticleSentencesExtractor.INSTANCE.getText(raw).replaceAll("\\s+", " ")), "")
         } catch {
           case ioe: java.io.IOException => failRet(base)
           case ste: java.net.SocketTimeoutException => failRet(base)
@@ -105,11 +116,14 @@ class Summary(ecp: ExecutionContext, repo: PlaceRepo) {
     }
 
     for {
-      (url1, dbSum, dbSumMod) <- getDBInfo(pid)
+      (url1, dbSum, dbSumMod, rComments, tComments) <- getDBInfo(pid)
       url2 <- if(url1 == "") getGoogWebsite(pid) else Future {url1}
       (s1, aUrl) <- if(dbSum == "" || sumModDateExp(dbSumMod)) helper(url2, "", true) else Future{(dbSum, "")}
       (s2, _) <- helper(aUrl, s1, false)
       i <- if(sumModDateExp(dbSumMod)) setNewSum(s2, pid) else Future {0}
-    } yield s2
+    } yield {
+      val details: Details = (s2, rComments, tComments)
+      Json.toJson(details)
+    }
   }
 }

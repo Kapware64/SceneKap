@@ -46,6 +46,30 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
     } yield result
   }
 
+  def upsertWebsite(pid:String, url: String): Future[Int] = db.run {
+    for {
+      rowsAffected <- places.filter(p => p.pid === pid).map(p => (p.website, p.last_summary_mod)).update(url, "0")
+      result <- rowsAffected match {
+        case 0 => places += Place(pid, "", "", url, "", "", "", "")
+        case 1 => DBIO.successful(1)
+        case n => DBIO.failed(new RuntimeException(
+          s"Expected 0 or 1 change, not $n for $pid"))
+      }
+    } yield result
+  }
+
+  def upsertPhoto(pid:String, url: String): Future[Int] = db.run {
+    for {
+      rowsAffected <- places.filter(p => p.pid === pid).map(p => p.photo_uri).update(url)
+      result <- rowsAffected match {
+        case 0 => places += Place(pid, "", "", "", url, "", "", "")
+        case 1 => DBIO.successful(1)
+        case n => DBIO.failed(new RuntimeException(
+          s"Expected 0 or 1 change, not $n for $pid"))
+      }
+    } yield result
+  }
+
 //  def create(pid:String, rC:String, tC:String, w:String, pUri: String, sum: String, lSumMod: String, e:String): Future[Int] = {
 //    val q = places += Place(pid, rC, tC, w, pUri, sum, lSumMod, e)
 //    db.run(q)
