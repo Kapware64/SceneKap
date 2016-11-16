@@ -32,6 +32,17 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
 
   private val places = TableQuery[PlaceTable]
 
+  private def voteComment(pid: String, cid: String, voteVal: Int): Future[Int] = db.run {
+    for {
+      rowsAffected <- places.filter(p => p.pid === pid).map(p => p.rComments).update(voteVal.toString + " Comment")
+      result <- rowsAffected match {
+        case 1 => DBIO.successful(1)
+        case n => DBIO.failed(new RuntimeException(
+          s"Expected 1 change, not $n for $pid"))
+      }
+    } yield result
+  }
+
   def upsertSummary(pid:String, sum: String): Future[Int] = db.run {
     val md = (System.currentTimeMillis / 1000).toString
 
@@ -70,36 +81,31 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
     } yield result
   }
 
-//  def create(pid:String, rC:String, tC:String, w:String, pUri: String, sum: String, lSumMod: String, e:String): Future[Int] = {
-//    val q = places += Place(pid, rC, tC, w, pUri, sum, lSumMod, e)
-//    db.run(q)
-//  }
-//
-//  def updateSummary(pid: String, newSummary: String): Future[Int] = db.run {
-//    val q = for { p <- places if p.pid === pid} yield p.summary
-//    q.update(newSummary)
-//  }
-//
-//  def updatePhotoUri(pid: String, uri: String): Future[Int] = db.run {
-//    val q = for { p <- places if p.pid === pid} yield p.photo_uri
-//    q.update(uri)
-//  }
-//
-//  def updateWebsite(pid: String, url: String): Future[Int] = db.run {
-//    val q = for { p <- places if p.pid === pid} yield p.website
-//    q.update(url)
-//  }
+  def addComment(pid: String, text: String): Future[Int] = db.run {
+    for {
+      rowsAffected <- places.filter(p => p.pid === pid).map(p => p.rComments).update(text)
+      result <- rowsAffected match {
+        case 0 => places += Place(pid, "0 " + text, "", "", "", "", "", "")
+        case 1 => DBIO.successful(1)
+        case n => DBIO.failed(new RuntimeException(
+          s"Expected 0 or 1 change, not $n for $pid"))
+      }
+    } yield result
+  }
+
+  def upvoteComment(pid: String, cid: String): Future[Int] = voteComment(pid, cid, 1)
+  def downvoteComment(pid: String, cid: String): Future[Int] = voteComment(pid, cid, -1)
 
   def getMult(pids: List[String]): Future[Seq[Place]] = db.run {
     places.filter(_.pid inSet(pids)).result
   }
 
-  def deleteAll(): Future[Int] = db.run {
-    places.delete
-  }
-
   def get(pid: String): Future[Option[Place]] = db.run {
     places.filter(_.pid === pid).result.headOption
+  }
+
+  def deleteAll(): Future[Int] = db.run {
+    places.delete
   }
 
   def list(): Future[Seq[Place]] = db.run {
