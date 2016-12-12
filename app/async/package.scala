@@ -7,8 +7,9 @@ import scala.io
   * Created by NoahKaplan on 10/26/16.
   */
 package object async {
-  val ABOUT_LINK_KEYWORDS: List[String] = List[String]("About", "about", "ABOUT")
-  val ABOUT_KEYWORDS: List[String] = List[String]("We, Our")
+  val ABOUT_LINK_KEYWORDS: List[String] = List[String]("ABOUT")
+  val ABOUT_KEYWORDS: List[String] = List[String]("WE", "OUR", "WAS", "ESTABLISHED", "FOUNDED")
+  val EMPTY_KEYWORDS: List[String] = List[String]("AND", "THE")
   val CONNECT_TIMEOUT = 5000
   val READ_TIMEOUT = 5000
   val MAX_PHOTO_WIDTH = 400
@@ -18,12 +19,21 @@ package object async {
   def calcSumScore(placeName: String, sum: String, about: Boolean): Int = {
     def helper(relWords: List[String], textWords: List[String], acc: Int, mult: Int): Int = {
       if(relWords.isEmpty) acc
-      else helper(relWords.tail, textWords, acc + textWords.count(_.toUpperCase == relWords.head.toUpperCase) * mult, mult)
+      else {
+        val curWordsUpper = relWords.head.toUpperCase
+        helper(relWords.tail, textWords, acc + textWords.count(_.toUpperCase == curWordsUpper) * mult, mult)
+      }
     }
 
-    val placeWords = placeName.split("\\s+").toList
+    def remEmptyWords(words: List[String], eWords: List[String], acc: List[String]): List[String] = {
+      if(words.isEmpty) acc
+      else if(eWords.contains(words.head.toUpperCase)) remEmptyWords(words.tail, eWords, acc)
+      else remEmptyWords(words.tail, eWords, words.head :: acc)
+    }
+
+    val placeWords = remEmptyWords(placeName.split("\\s+").toList, EMPTY_KEYWORDS, List[String]())
     val numPlaceWords = placeWords.size
-    val aboutScore = if(about) helper(ABOUT_KEYWORDS, sum.split("\\s+").toList, 0, numPlaceWords) else 0
+    val aboutScore = if(about) helper(ABOUT_KEYWORDS, sum.split("\\s+").toList, 0, numPlaceWords / 2) else 0
     helper(placeWords, sum.split("\\s+").toList, 0, 1) + aboutScore
   }
 

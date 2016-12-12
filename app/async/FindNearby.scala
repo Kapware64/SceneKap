@@ -12,7 +12,7 @@ import play.api.libs.json._
 class FindNearby(ecp: ExecutionContext, repo: PlaceRepo) {
   implicit val ec = ecp
 
-  type NearbyElem = (String, String, String, String, String, String)
+  type NearbyElem = (String, String, String, String, String, String, String)
 
   implicit val nearbyElemDetWrites = new Writes[NearbyElem] {
     def writes(e: NearbyElem) = Json.obj(
@@ -21,7 +21,8 @@ class FindNearby(ecp: ExecutionContext, repo: PlaceRepo) {
       "lat" -> e._3,
       "long" -> e._4,
       "vicinity" -> e._5,
-      "photo_uri" -> e._6
+      "photo_uri" -> e._6,
+      "viewport" -> e._7
     )
   }
 
@@ -48,10 +49,16 @@ class FindNearby(ecp: ExecutionContext, repo: PlaceRepo) {
             else ""
           case _ => ""
         }
+        val viewportRef: String = (e \ "geometry" \ "viewport" \ "northeast" \ "lat", e \ "geometry" \ "viewport" \ "northeast" \ "lng",
+                                   e \ "geometry" \ "viewport" \ "southwest" \ "lat", e \ "geometry" \ "viewport" \ "southwest" \ "lng") match {
+          case (JsDefined(JsNumber(l1)), JsDefined(JsNumber(l2)), JsDefined(JsNumber(l3)), JsDefined(JsNumber(l4))) =>
+            l1.toString + ", " + l2.toString + ", " + l3.toString + ", " + l4.toString
+          case _ => ""
+        }
 
         reqFields match {
           case Some((pid, n, l1, l2, v)) =>
-            (pid, n, l1, l2, v, photoRef) :: a
+            (pid, n, l1, l2, v, photoRef, viewportRef) :: a
           case None => a
         }
       }
@@ -73,7 +80,7 @@ class FindNearby(ecp: ExecutionContext, repo: PlaceRepo) {
 
   def procPhotoUris(l: List[NearbyElem], p: Seq[Place]): List[NearbyElem] = {
     def changeUri(e: NearbyElem, p: Place): NearbyElem = {
-      (e._1, e._2, e._3, e._4, e._5, p.photo_uri)
+      (e._1, e._2, e._3, e._4, e._5, p.photo_uri, e._7)
     }
 
     def helper(acc: List[NearbyElem], l: List[NearbyElem], p: Seq[Place]): List[NearbyElem] = {

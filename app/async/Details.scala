@@ -26,7 +26,9 @@ class Details(ecp: ExecutionContext, repo: PlaceRepo) {
     )
   }
 
-  //TODO: When migrating to MongoDB, the comment type should be List[Comment] where Comment is defined as (id: Int, votes: Int, date: String, text: String).
+  //TODO: implicit val commentElemWrites
+
+  //TODO: When migrating to MongoDB, the comment type should be List[Comment] where Comment is defined as (id: Int, poster: String, votes: Int, date: String, text: String).
   private def getDBInfo(pid: String): Future[(String, String, String, String, String)] = {
     def procRes(res: Option[Place]): (String, String, String, String, String) = {
       res match {
@@ -61,7 +63,7 @@ class Details(ecp: ExecutionContext, repo: PlaceRepo) {
 
     def loop(l: List[TagNode]): String = {
       if(l.isEmpty) ""
-      else if(ABOUT_LINK_KEYWORDS.exists(l.head.getText.toString.contains)) l.head.getAttributeByName("href")
+      else if(ABOUT_LINK_KEYWORDS.exists(l.head.getText.toString.toUpperCase.contains)) l.head.getAttributeByName("href")
       else loop(l.tail)
     }
 
