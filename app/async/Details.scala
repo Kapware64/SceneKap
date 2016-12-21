@@ -26,9 +26,6 @@ class Details(ecp: ExecutionContext, repo: PlaceRepo) {
     )
   }
 
-  //TODO: implicit val commentElemWrites
-
-  //TODO: When migrating to MongoDB, the comment type should be List[Comment] where Comment is defined as (id: Int, poster: String, votes: Int, date: String, text: String).
   private def getDBInfo(pid: String): Future[(String, String, String, String, String)] = {
     def procRes(res: Option[Place]): (String, String, String, String, String) = {
       res match {

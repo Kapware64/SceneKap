@@ -1,5 +1,7 @@
 import de.l3s.boilerpipe.extractors.KeepEverythingExtractor
+import org.mongodb.scala.bson.BsonValue
 import play.api.libs.json._
+import org.mongodb.scala.bson.collection.immutable.Document
 
 import scala.io
 

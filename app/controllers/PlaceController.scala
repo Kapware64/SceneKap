@@ -20,6 +20,8 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
   val findNearby = new FindNearby(ec, repo)
   val getDetails = new Details(ec, repo)
 
+  //TODO: Add recovers to each map. See if they are called appropriately whenever a future is failed
+
   def index = Action {
     Ok(views.html.index(llForm)(detForm)(changeURLForm)(changePhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
   }

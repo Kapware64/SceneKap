@@ -5,111 +5,155 @@ import javax.inject.{Inject, Singleton}
 import play.api.db.slick.DatabaseConfigProvider
 import slick.driver.JdbcProfile
 import models.Place
-import org.mongodb.scala.MongoClient
+import org.mongodb.scala.bson._
+import org.mongodb.scala.bson.collection.immutable.Document
+import org.mongodb.scala.bson.conversions.Bson
+import org.mongodb.scala.model.Filters._
+import org.mongodb.scala.model.Updates._
+import org.mongodb.scala.{Completed, MongoClient, MongoCollection, MongoDatabase}
+import play.api.libs.json.Json
 
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
 class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec: ExecutionContext) {
-  private val dbConfig = dbConfigProvider.get[JdbcProfile]
+  val mongoClient: MongoClient = MongoClient("mongodb://localhost/?connectTimeoutMS=5000&socketTimeoutMS=5000")
+  val database: MongoDatabase = mongoClient.getDatabase("SK")
+  val collection: MongoCollection[Document] = database.getCollection("places")
 
-  import dbConfig._
-  import driver.api._
-
-  private class PlaceTable(tag: Tag) extends Table[Place](tag, "places") {
-    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-    def pid = column[String]("pid")
-    def rComments = column[String]("rComments")
-    def tComments = column[String]("tComments")
-    def website = column[String]("website")
-    def photo_uri = column[String]("photo_uri")
-    def summary = column[String]("summary")
-    def last_summary_mod = column[String]("last_summary_mod")
-    def extra = column[String]("extra")
-
-    def * = (pid, rComments, tComments, website, photo_uri, summary, last_summary_mod, extra) <>
-            ((Place.apply _).tupled, Place.unapply)
+  private def voteComment(pid: String, cid: String, voteVal: Int): Future[Int] = Future {
+    -1
   }
 
-  private val places = TableQuery[PlaceTable]
+  private def convDecToPlace(doc: Document): Option[Place] = {
+    val rComments = getArrFieldAsJson(doc, "rComments")
+    val tComments = getArrFieldAsJson(doc, "tComments")
+    val pid = doc.getString("pid")
+    val websiteRaw = doc.getString("website")
+    val website = if(websiteRaw == null) "" else websiteRaw
+    val photoRaw = doc.getString("photo_uri")
+    val photo_uri = if(photoRaw == null) "" else photoRaw
+    val summaryRaw = doc.getString("summary")
+    val summary = if(summaryRaw == null) "" else summaryRaw
+    val sumModRaw = doc.getString("last_summary_mod")
+    val last_summary_mod = if(sumModRaw == null) "" else sumModRaw
+    val extra = ""
+    Some(Place(pid, rComments, tComments, website, photo_uri, summary, last_summary_mod, extra))
+  }
 
-  private def voteComment(pid: String, cid: String, voteVal: Int): Future[Int] = db.run {
-    for {
-      rowsAffected <- places.filter(p => p.pid === pid).map(p => p.rComments).update(voteVal.toString + " Comment")
-      result <- rowsAffected match {
-        case 1 => DBIO.successful(1)
-        case n => DBIO.failed(new RuntimeException(
-          s"Expected 1 change, not $n for $pid"))
+  private def convDecToPlaces(docs: Seq[Document]): List[Place] = {
+    def helper(docs: Seq[Document], acc: List[Place]): List[Place] = {
+      if(docs.isEmpty) acc
+      else {
+        val plOpt = convDecToPlace(docs.head)
+        plOpt match {
+          case Some(pl) => helper(docs.tail, pl :: acc)
+          case None => helper(docs.tail, acc)
+        }
       }
-    } yield result
+    }
+
+    helper(docs.reverse, List[Place]())
   }
 
-  def upsertSummary(pid:String, sum: String): Future[Int] = db.run {
+  private def convPidsToBsonQuery(pids: List[String]): Bson = {
+    def helper(pids: List[String], acc: Bson): Bson = {
+      if(pids.isEmpty) acc
+      else helper(pids.tail, combine(equal("pid", pids.head), acc))
+    }
+
+    helper(pids, combine())
+  }
+
+  def upsertSummary(pid: String, sum: String): Future[Int] = {
     val md = (System.currentTimeMillis / 1000).toString
 
     for {
-      rowsAffected <- places.filter(p => p.pid === pid).map(p => (p.summary, p.last_summary_mod)).update(sum, md)
-      result <- rowsAffected match {
-        case 0 => places += Place(pid, "", "", "", "", sum, md, "")
-        case 1 => DBIO.successful(1)
-        case n => DBIO.failed(new RuntimeException(
-          s"Expected 0 or 1 change, not $n for $pid"))
+      updateRes <- collection.updateOne(equal("pid", pid), combine(set("summary", sum), set("last_summary_mod", md))).toFuture
+      addRes <- {
+        if(updateRes.head.getMatchedCount == 0) {
+          val doc: Document = Document("pid" -> pid, "summary" -> sum, "last_summary_mod" -> md)
+          collection.insertOne(doc).toFuture
+        }
+        else Future{Seq[Completed](Completed())}
       }
-    } yield result
+      finalRes <- Future{if(addRes.isEmpty) 0 else 1}
+    } yield finalRes
   }
 
-  def upsertWebsite(pid:String, url: String): Future[Int] = db.run {
+  def upsertWebsite(pid:String, url: String): Future[Int] = {
     for {
-      rowsAffected <- places.filter(p => p.pid === pid).map(p => (p.website, p.last_summary_mod)).update(url, "0")
-      result <- rowsAffected match {
-        case 0 => places += Place(pid, "", "", url, "", "", "", "")
-        case 1 => DBIO.successful(1)
-        case n => DBIO.failed(new RuntimeException(
-          s"Expected 0 or 1 change, not $n for $pid"))
+      updateRes <- collection.updateOne(equal("pid", pid), set("website", url)).toFuture
+      addRes <- {
+        if(updateRes.head.getMatchedCount == 0) {
+          val doc: Document = Document("pid" -> pid, "website" -> url, "last_summary_mod" -> "0")
+          collection.insertOne(doc).toFuture
+        }
+        else Future{Seq[Completed](Completed())}
       }
-    } yield result
+      finalRes <- Future{if(addRes.isEmpty) 0 else 1}
+    } yield finalRes
   }
 
-  def upsertPhoto(pid:String, url: String): Future[Int] = db.run {
+  def upsertPhoto(pid:String, url: String): Future[Int] = {
     for {
-      rowsAffected <- places.filter(p => p.pid === pid).map(p => p.photo_uri).update(url)
-      result <- rowsAffected match {
-        case 0 => places += Place(pid, "", "", "", url, "", "", "")
-        case 1 => DBIO.successful(1)
-        case n => DBIO.failed(new RuntimeException(
-          s"Expected 0 or 1 change, not $n for $pid"))
+      updateRes <- collection.updateOne(equal("pid", pid), set("photo_uri", url)).toFuture
+      addRes <- {
+        if(updateRes.head.getMatchedCount == 0) {
+          val doc: Document = Document("pid" -> pid, "photo_uri" -> url)
+          collection.insertOne(doc).toFuture
+        }
+        else Future{Seq[Completed](Completed())}
       }
-    } yield result
+      finalRes <- Future{if(addRes.isEmpty) 0 else 1}
+    } yield finalRes
   }
 
-  def addComment(pid: String, text: String): Future[Int] = db.run {
-    for {
-      rowsAffected <- places.filter(p => p.pid === pid).map(p => p.rComments).update(text)
-      result <- rowsAffected match {
-        case 0 => places += Place(pid, "0 " + text, "", "", "", "", "", "")
-        case 1 => DBIO.successful(1)
-        case n => DBIO.failed(new RuntimeException(
-          s"Expected 0 or 1 change, not $n for $pid"))
+  def getArrFieldAsJson(doc: Document, keyword: String): String = {
+    def jsonizeArr(arr: BsonArray): String = {
+      val size = arr.size
+
+      def helper(ind: Int, acc: String): String = {
+        if(ind >= size) acc + "]"
+        else helper(ind + 1, acc + "," + arr.get(ind).asDocument.toJson)
       }
-    } yield result
+
+      helper(0, "").replaceFirst(",", "[")
+    }
+
+    doc.get(keyword) match {
+      case Some(res) => jsonizeArr(res.asArray)
+      case _ => ""
+    }
+  }
+
+  def get(pid: String): Future[Option[Place]] = {
+    for {
+      res <- collection.find(equal("pid", pid)).first.toFuture
+      place <- Future{convDecToPlace(res.head)}
+    } yield place
+  }
+
+  def getMult(pids: List[String]): Future[List[Place]] = {
+    val bson: Bson = convPidsToBsonQuery(pids)
+
+    for {
+      res <- collection.find(combine(equal("pid", pids.head), combine())).toFuture //bson
+      place <- Future{convDecToPlaces(res)}
+    } yield place
+  }
+
+  def list(): Future[List[Place]] = {
+    for {
+      res <- collection.find().toFuture
+      place <- Future{convDecToPlaces(res)}
+    } yield place
+  }
+
+  def addComment(pid: String, text: String): Future[Int] = Future {
+    -1
   }
 
   def upvoteComment(pid: String, cid: String): Future[Int] = voteComment(pid, cid, 1)
   def downvoteComment(pid: String, cid: String): Future[Int] = voteComment(pid, cid, -1)
-
-  def getMult(pids: List[String]): Future[Seq[Place]] = db.run {
-    places.filter(_.pid inSet(pids)).result
-  }
-
-  def get(pid: String): Future[Option[Place]] = db.run {
-    places.filter(_.pid === pid).result.headOption
-  }
-
-  def deleteAll(): Future[Int] = db.run {
-    places.delete
-  }
-
-  def list(): Future[Seq[Place]] = db.run {
-    places.result
-  }
 }

@@ -78,12 +78,12 @@ class FindNearby(ecp: ExecutionContext, repo: PlaceRepo) {
     }
   }
 
-  def procPhotoUris(l: List[NearbyElem], p: Seq[Place]): List[NearbyElem] = {
+  def procPhotoUris(l: List[NearbyElem], p: List[Place]): List[NearbyElem] = {
     def changeUri(e: NearbyElem, p: Place): NearbyElem = {
       (e._1, e._2, e._3, e._4, e._5, p.photo_uri, e._7)
     }
 
-    def helper(acc: List[NearbyElem], l: List[NearbyElem], p: Seq[Place]): List[NearbyElem] = {
+    def helper(acc: List[NearbyElem], l: List[NearbyElem], p: List[Place]): List[NearbyElem] = {
       if(l.isEmpty) acc
       else if(p.isEmpty) acc ++ l
       else {
