@@ -14,7 +14,8 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
 class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec: ExecutionContext) {
-  val mongoClient: MongoClient = MongoClient("mongodb://localhost/?connectTimeoutMS=5000&socketTimeoutMS=5000")
+  val strConf: String = "mongodb://localhost/?connectTimeoutMS=7500&socketTimeoutMS=7500&serverSelectionTimeoutMS=10000"
+  val mongoClient: MongoClient = MongoClient(strConf)
   val database: MongoDatabase = mongoClient.getDatabase("SK")
   val collection: MongoCollection[Document] = database.getCollection("places")
 
@@ -54,7 +55,7 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
   }
 
   def upsertSummary(pid: String, sum: String): Future[Int] = {
-    val md = (System.currentTimeMillis / 1000).toString
+    val md = if(sum.isEmpty) "0" else (System.currentTimeMillis / 1000).toString
 
     for {
       updateRes <- collection.updateOne(equal("pid", pid), combine(set("summary", sum), set("last_summary_mod", md))).toFuture
