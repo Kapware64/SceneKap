@@ -20,8 +20,6 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
   val findNearby = new FindNearby(ec, repo)
   val getDetails = new Details(ec, repo)
 
-  //TODO: Add recovers to each map. See if they are called appropriately whenever a future is failed
-
   def index = Action {
     Ok(views.html.index(llForm)(detForm)(changeURLForm)(changePhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
   }
@@ -29,48 +27,64 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
   def nearby(lat: String, long: String) = Action.async {
     findNearby.getNearbyJson(lat, long).map { res =>
       Ok(res)
+    } recover {
+      case _ => ServiceUnavailable("Database query failed")
     }
   }
 
   def details(pid: String, name: String) = Action.async {
     getDetails.getDetailsJson(pid: String, name: String).map { det =>
       Ok(det)
+    } recover {
+      case _ => ServiceUnavailable("Database query failed")
     }
   }
 
   def changeWebsite(pid: String, url: String) = Action.async {
     repo.upsertWebsite(pid, url).map { res =>
       Ok(res.toString)
+    } recover {
+      case _ => ServiceUnavailable("Database query failed")
     }
   }
 
   def changePhoto(pid: String, url: String) = Action.async {
     repo.upsertPhoto(pid, url).map { res =>
       Ok(res.toString)
+    } recover {
+      case _ => ServiceUnavailable("Database query failed")
     }
   }
 
   def addComment(pid: String, text: String) = Action.async {
     repo.addComment(pid, text).map { res =>
       Ok(res.toString)
+    } recover {
+      case _ => ServiceUnavailable("Database query failed")
     }
   }
 
   def upvoteComment(pid: String, cid: String) = Action.async {
     repo.upvoteComment(pid, cid).map { res =>
       Ok(res.toString)
+    } recover {
+      case _ => ServiceUnavailable("Database query failed")
     }
   }
 
   def downvoteComment(pid: String, cid: String) = Action.async {
     repo.downvoteComment(pid, cid).map { res =>
       Ok(res.toString)
+    } recover {
+      case _ => ServiceUnavailable("Database query failed")
     }
   }
 
   def getAll = Action.async { implicit request =>
     repo.list().map { data =>
       Ok(Json.toJson(data))
+    } recover {
+      case _ => ServiceUnavailable("Database query failed")
     }
   }
 
@@ -150,11 +164,15 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
       errorForm => {
         repo.list().map { _ =>
           Ok(views.html.index(llForm)(detForm)(errorForm)(changePhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
         }
       },
       p => {
         repo.upsertWebsite(p.pid, p.url).map { res =>
           Ok(res.toString)
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
         }
       }
     )
@@ -165,11 +183,15 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
       errorForm => {
         repo.list().map { _ =>
           Ok(views.html.index(llForm)(detForm)(changeURLForm)(errorForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
         }
       },
       p => {
         repo.upsertPhoto(p.pid, p.url).map { res =>
           Ok(res.toString)
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
         }
       }
     )
@@ -180,11 +202,15 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
       errorForm => {
         repo.list().map { _ =>
           Ok(views.html.index(llForm)(detForm)(changeURLForm)(changePhotoForm)(errorForm)(upvoteCommentForm)(downvoteCommentForm))
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
         }
       },
       p => {
         repo.addComment(p.pid, p.text).map { res =>
           Ok(res.toString)
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
         }
       }
     )
@@ -195,11 +221,15 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
       errorForm => {
         repo.list().map { _ =>
           Ok(views.html.index(llForm)(detForm)(changeURLForm)(changePhotoForm)(postCommentForm)(errorForm)(downvoteCommentForm))
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
         }
       },
       p => {
         repo.upvoteComment(p.pid, p.cid.toString).map { res =>
           Ok(res.toString)
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
         }
       }
     )
@@ -210,11 +240,15 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
       errorForm => {
         repo.list().map { _ =>
           Ok(views.html.index(llForm)(detForm)(changeURLForm)(changePhotoForm)(postCommentForm)(upvoteCommentForm)(errorForm))
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
         }
       },
       p => {
         repo.downvoteComment(p.pid, p.cid.toString).map { res =>
           Ok(res.toString)
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
         }
       }
     )

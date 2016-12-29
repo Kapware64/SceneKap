@@ -3,15 +3,12 @@ package db
 import javax.inject.{Inject, Singleton}
 
 import play.api.db.slick.DatabaseConfigProvider
-import slick.driver.JdbcProfile
 import models.Place
 import org.mongodb.scala.bson._
 import org.mongodb.scala.bson.collection.immutable.Document
-import org.mongodb.scala.bson.conversions.Bson
 import org.mongodb.scala.model.Filters._
 import org.mongodb.scala.model.Updates._
 import org.mongodb.scala.{Completed, MongoClient, MongoCollection, MongoDatabase}
-import play.api.libs.json.Json
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -121,7 +118,7 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
   def get(pid: String): Future[Option[Place]] = {
     for {
       res <- collection.find(equal("pid", pid)).first.toFuture
-      place <- Future{convDecToPlace(res.head)}
+      place <- if(res.isEmpty) Future{None} else Future{convDecToPlace(res.head)}
     } yield place
   }
 
@@ -146,6 +143,3 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
   def upvoteComment(pid: String, cid: String): Future[Int] = voteComment(pid, cid, 1)
   def downvoteComment(pid: String, cid: String): Future[Int] = voteComment(pid, cid, -1)
 }
-
-//TODO: GetMult and Nearby should work so that photo entries in db replace google photo entries
-//TODO: Add measures for failing gracefully
