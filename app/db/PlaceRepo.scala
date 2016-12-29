@@ -56,15 +56,6 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
     helper(docs.reverse, List[Place]())
   }
 
-  private def convPidsToBsonQuery(pids: List[String]): Bson = {
-    def helper(pids: List[String], acc: Bson): Bson = {
-      if(pids.isEmpty) acc
-      else helper(pids.tail, combine(equal("pid", pids.head), acc))
-    }
-
-    helper(pids, combine())
-  }
-
   def upsertSummary(pid: String, sum: String): Future[Int] = {
     val md = (System.currentTimeMillis / 1000).toString
 
@@ -83,7 +74,7 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
 
   def upsertWebsite(pid:String, url: String): Future[Int] = {
     for {
-      updateRes <- collection.updateOne(equal("pid", pid), set("website", url)).toFuture
+      updateRes <- collection.updateOne(equal("pid", pid), combine(set("website", url), set("last_summary_mod", "0"))).toFuture
       addRes <- {
         if(updateRes.head.getMatchedCount == 0) {
           val doc: Document = Document("pid" -> pid, "website" -> url, "last_summary_mod" -> "0")
@@ -135,10 +126,8 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
   }
 
   def getMult(pids: List[String]): Future[List[Place]] = {
-    val bson: Bson = convPidsToBsonQuery(pids)
-
     for {
-      res <- collection.find(combine(equal("pid", pids.head), combine())).toFuture //bson
+      res <- collection.find(in("pid", pids: _*)).toFuture
       place <- Future{convDecToPlaces(res)}
     } yield place
   }
@@ -157,3 +146,6 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
   def upvoteComment(pid: String, cid: String): Future[Int] = voteComment(pid, cid, 1)
   def downvoteComment(pid: String, cid: String): Future[Int] = voteComment(pid, cid, -1)
 }
+
+//TODO: GetMult and Nearby should work so that photo entries in db replace google photo entries
+//TODO: Add measures for failing gracefully
