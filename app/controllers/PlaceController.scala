@@ -10,7 +10,8 @@ import javax.inject._
 
 import async._
 import db.PlaceRepo
-import play.api.libs.json.Json
+import models.Place
+import play.api.libs.json.{Json, Writes}
 
 /**
   * Created by NoahKaplan on 10/25/16.
@@ -19,6 +20,19 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
                                  (implicit ec: ExecutionContext) extends Controller with I18nSupport {
   val findNearby = new FindNearby(ec, repo)
   val getDetails = new Details(ec, repo)
+
+  implicit val nearbyElemDetWrites = new Writes[Place] {
+    def writes(p: Place) = Json.obj(
+      "pid" -> p.pid,
+      "rComments" -> Json.parse(p.rComments),
+      "tComments" -> Json.parse(p.tComments),
+      "website" -> p.website,
+      "photo_uri" -> p.photo_uri,
+      "summary" -> p.summary,
+      "last_summary_mod" -> p.last_summary_mod,
+      "extra" -> p.extra
+    )
+  }
 
   def index = Action {
     Ok(views.html.index(llForm)(detForm)(changeURLForm)(changePhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))

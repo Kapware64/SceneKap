@@ -16,16 +16,6 @@ import models.Place
 class Details(ecp: ExecutionContext, repo: PlaceRepo) {
   implicit val ec = ecp
 
-  type Details = (String, String, String)
-
-  implicit val nearbyElemDetWrites = new Writes[Details] {
-    def writes(e: Details) = Json.obj(
-      "summary" -> e._1,
-      "rComments" -> e._2,
-      "tComments" -> e._3
-    )
-  }
-
   private def getDBInfo(pid: String): Future[(String, String, String, String, String)] = {
     def procRes(res: Option[Place]): (String, String, String, String, String) = {
       res match {
@@ -96,7 +86,7 @@ class Details(ecp: ExecutionContext, repo: PlaceRepo) {
     repo.upsertSummary(pid, summary)
   }
 
-  def getDetailsJson(pid: String, name: String): Future[JsValue] = {
+  def getDetailsJson(pid: String, name: String): Future[String] = {
     def helper(url: String, pSum: String, base: Boolean): Future[(String, String)] = Future {
       def failRet(base: Boolean) = if(base) ("", "") else (pSum, "")
 
@@ -120,9 +110,6 @@ class Details(ecp: ExecutionContext, repo: PlaceRepo) {
       (s1, aUrl) <- if(dbSum == "" || sumModDateExp(dbSumMod)) helper(url2, "", true) else Future{(dbSum, "")}
       (s2, _) <- helper(aUrl, s1, false)
       i <- if(sumModDateExp(dbSumMod)) setNewSum(s2, pid) else Future {0}
-    } yield {
-      val details: Details = (s2, rComments, tComments)
-      Json.toJson(details)
-    }
+    } yield "{ " + "\"summary\" : \"" + s2 + "\", \"rComments\" : " + rComments + ", \"tComments\" : " + tComments + " }"
   }
 }

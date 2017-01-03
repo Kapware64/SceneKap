@@ -1,14 +1,20 @@
 package db
 
+import java.text.SimpleDateFormat
+import java.util.Calendar
 import javax.inject.{Inject, Singleton}
 
+import com.mongodb.client.model.FindOneAndUpdateOptions
+import com.mongodb.client.result.UpdateResult
 import play.api.db.slick.DatabaseConfigProvider
 import models.Place
 import org.mongodb.scala.bson._
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.Filters._
+import org.mongodb.scala.model.{ReturnDocument, UpdateOptions}
 import org.mongodb.scala.model.Updates._
-import org.mongodb.scala.{Completed, MongoClient, MongoCollection, MongoDatabase}
+import org.mongodb.scala.result.UpdateResult
+import org.mongodb.scala.{MongoClient, MongoCollection, MongoDatabase}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -18,6 +24,15 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
   val mongoClient: MongoClient = MongoClient(strConf)
   val database: MongoDatabase = mongoClient.getDatabase("SK")
   val collection: MongoCollection[Document] = database.getCollection("places")
+
+  val MAX_RECENT_COMMENTS: Int = 10
+
+  val upst: UpdateOptions = new UpdateOptions
+  val upstF: FindOneAndUpdateOptions = new FindOneAndUpdateOptions
+
+  upst.upsert(true)
+  upstF.returnDocument(ReturnDocument.AFTER)
+  upstF.upsert(true)
 
   private def voteComment(pid: String, cid: String, voteVal: Int): Future[Int] = Future {
     -1
@@ -54,47 +69,32 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
     helper(docs.reverse, List[Place]())
   }
 
+  private def getCurDateSeconds: String = (System.currentTimeMillis / 1000).toString
+  private def getDay: String = {
+    val format = new SimpleDateFormat("M/d/y")
+    format.format(Calendar.getInstance().getTime())
+  }
+
   def upsertSummary(pid: String, sum: String): Future[Int] = {
-    val md = if(sum.isEmpty) "0" else (System.currentTimeMillis / 1000).toString
+    val md = if(sum.isEmpty) "0" else getCurDateSeconds
 
     for {
-      updateRes <- collection.updateOne(equal("pid", pid), combine(set("summary", sum), set("last_summary_mod", md))).toFuture
-      addRes <- {
-        if(updateRes.head.getMatchedCount == 0) {
-          val doc: Document = Document("pid" -> pid, "summary" -> sum, "last_summary_mod" -> md)
-          collection.insertOne(doc).toFuture
-        }
-        else Future{Seq[Completed](Completed())}
-      }
-      finalRes <- Future{if(addRes.isEmpty) 0 else 1}
+      updateRes <- collection.updateOne(equal("pid", pid), combine(set("summary", sum), set("last_summary_mod", md)), upst).toFuture
+      finalRes <- if(updateRes.head.wasAcknowledged) Future{1} else Future{0}
     } yield finalRes
   }
 
   def upsertWebsite(pid:String, url: String): Future[Int] = {
     for {
-      updateRes <- collection.updateOne(equal("pid", pid), combine(set("website", url), set("last_summary_mod", "0"))).toFuture
-      addRes <- {
-        if(updateRes.head.getMatchedCount == 0) {
-          val doc: Document = Document("pid" -> pid, "website" -> url, "last_summary_mod" -> "0")
-          collection.insertOne(doc).toFuture
-        }
-        else Future{Seq[Completed](Completed())}
-      }
-      finalRes <- Future{if(addRes.isEmpty) 0 else 1}
+      updateRes <- collection.updateOne(equal("pid", pid), combine(set("website", url), set("last_summary_mod", "0")), upst).toFuture
+      finalRes <- if(updateRes.head.wasAcknowledged) Future{1} else Future{0}
     } yield finalRes
   }
 
   def upsertPhoto(pid:String, url: String): Future[Int] = {
     for {
-      updateRes <- collection.updateOne(equal("pid", pid), set("photo_uri", url)).toFuture
-      addRes <- {
-        if(updateRes.head.getMatchedCount == 0) {
-          val doc: Document = Document("pid" -> pid, "photo_uri" -> url)
-          collection.insertOne(doc).toFuture
-        }
-        else Future{Seq[Completed](Completed())}
-      }
-      finalRes <- Future{if(addRes.isEmpty) 0 else 1}
+      updateRes <- collection.updateOne(equal("pid", pid), set("photo_uri", url), upst).toFuture
+      finalRes <- if(updateRes.head.wasAcknowledged) Future{1} else Future{0}
     } yield finalRes
   }
 
@@ -112,7 +112,7 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
 
     doc.get(keyword) match {
       case Some(res) => jsonizeArr(res.asArray)
-      case _ => ""
+      case _ => "[]"
     }
   }
 
@@ -137,10 +137,31 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
     } yield place
   }
 
-  def addComment(pid: String, text: String): Future[Int] = Future {
-    -1
+  def addComment(pid: String, text: String): Future[Int] = {
+    val comment = Document("id" -> pid, "votes" -> 0, "date" -> getDay, "text" -> text)
+
+    for {
+      pushRes <- collection.findOneAndUpdate(equal("pid", pid), push("rComments", comment), upstF).toFuture
+      numComments <- if(pushRes == null) Future{0} else {
+        pushRes.head.get("rComments") match {
+          case Some(rComments) => if(rComments.isArray) Future{rComments.asArray.size} else Future{0}
+          case _ => Future{0}
+        }
+      }
+      action <-
+        if(numComments <= 0) Future{CommentAddAction(false, true)}
+        else if(numComments <= MAX_RECENT_COMMENTS) Future{CommentAddAction(false, false)}
+        else Future{CommentAddAction(true, false)}
+      addCommentRes <-
+        if(action.failed) Future{Seq[UpdateResult](UpdateResult.unacknowledged)}
+        else if(action.needAdjust) collection.updateOne(equal("pid", pid), popFirst("rComments")).toFuture
+        else Future{Seq[UpdateResult](UpdateResult.acknowledged(0, 0.toLong, BsonNumber(0)))}
+      finalRes <- if(addCommentRes.head.wasAcknowledged) Future{1} else Future{0}
+    } yield finalRes
   }
 
   def upvoteComment(pid: String, cid: String): Future[Int] = voteComment(pid, cid, 1)
   def downvoteComment(pid: String, cid: String): Future[Int] = voteComment(pid, cid, -1)
 }
+
+case class CommentAddAction(needAdjust: Boolean, failed: Boolean)
