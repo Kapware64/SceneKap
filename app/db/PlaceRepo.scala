@@ -5,16 +5,15 @@ import java.util.Calendar
 import javax.inject.{Inject, Singleton}
 
 import com.mongodb.client.model.FindOneAndUpdateOptions
-import com.mongodb.client.result.UpdateResult
 import play.api.db.slick.DatabaseConfigProvider
 import models.Place
-import org.mongodb.scala.bson._
+import org.mongodb.scala.bson.{BsonObjectId, _}
 import org.mongodb.scala.bson.collection.immutable.Document
 import org.mongodb.scala.model.Filters._
-import org.mongodb.scala.model.{ReturnDocument, UpdateOptions}
+import org.mongodb.scala.model.{PushOptions, ReturnDocument, UpdateOptions}
 import org.mongodb.scala.model.Updates._
-import org.mongodb.scala.result.UpdateResult
 import org.mongodb.scala.{MongoClient, MongoCollection, MongoDatabase}
+import org.mongodb.scala.model.Indexes._
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -25,18 +24,25 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
   val database: MongoDatabase = mongoClient.getDatabase("SK")
   val collection: MongoCollection[Document] = database.getCollection("places")
 
-  val MAX_RECENT_COMMENTS: Int = 10
+  val MAX_RECENT_COMMENTS: Int = 5
+  val MAX_TOP_COMMENTS: Int = 3
+  val DEFAULT_COMMENT: Document = Document("id" -> "", "votes" -> -10000, "date" -> "", "text" -> "")
 
   val upst: UpdateOptions = new UpdateOptions
-  val upstF: FindOneAndUpdateOptions = new FindOneAndUpdateOptions
+  val after: FindOneAndUpdateOptions = new FindOneAndUpdateOptions
+  val rPushOpt: PushOptions = new PushOptions
+  val tPushOpt: PushOptions = new PushOptions
 
   upst.upsert(true)
-  upstF.returnDocument(ReturnDocument.AFTER)
-  upstF.upsert(true)
+  after.returnDocument(ReturnDocument.AFTER)
+  after.upsert(true)
+  rPushOpt.slice(-1 * MAX_RECENT_COMMENTS)
+  tPushOpt.sortDocument(descending("votes"))
+  tPushOpt.slice(MAX_TOP_COMMENTS)
 
-  private def voteComment(pid: String, cid: String, voteVal: Int): Future[Int] = Future {
-    -1
-  }
+  collection.createIndex(ascending("pid"))
+  collection.createIndex(compoundIndex(ascending("pid"), ascending("rComments.id")))
+  collection.createIndex(compoundIndex(ascending("pid"), ascending("tComments.id")))
 
   private def convDecToPlace(doc: Document): Option[Place] = {
     val rComments = getArrFieldAsJson(doc, "rComments")
@@ -69,10 +75,44 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
     helper(docs.reverse, List[Place]())
   }
 
+  private def getArrFieldAsList(doc: Document, field: String): List[Document] = {
+    def proc(arr: BsonArray): List[Document] = {
+      val size = arr.size
+
+      def helper(ind: Int, acc: List[Document]): List[Document] = {
+        if(ind >= size) acc
+        else helper(ind + 1, arr.get(ind).asDocument :: acc)
+      }
+
+      helper(0, List[Document]())
+    }
+
+    doc.get(field) match {
+      case Some(res) => proc(res.asArray)
+      case _ => List[Document]()
+    }
+  }
+
+  private def voteComment(pid: String, cid: String, voteVal: Int): Future[Int] = {
+    if(voteVal > 0) after.projection(elemMatch("rComments", equal("id", cid))) else after.projection(null)
+
+    for {
+      toPush <- collection.findOneAndUpdate(and(equal("pid", pid), equal("rComments.id", cid)), inc("rComments.$.votes", voteVal), after).toFuture
+      tRes <- collection.updateOne(and(equal("pid", pid), equal("tComments.id", cid)), inc("tComments.$.votes", voteVal)).toFuture
+      finalRes <-
+      if((tRes.head.getMatchedCount.toInt > 0 && voteVal > 0) || (tRes.head.getMatchedCount.toInt == 0 && voteVal < 0)) Future{1}
+      else for {
+        addRes <- collection.updateOne(equal("pid", pid), addEachToSet("tComments", getArrFieldAsList(toPush.head, "rComments"): _*)).toFuture
+        sortRes <- collection.updateOne(equal("pid", pid), pushEach("tComments", tPushOpt, List[Document](): _*)).toFuture
+        composite <- if(addRes.head.wasAcknowledged && sortRes.head.wasAcknowledged) Future{1} else Future{0}
+      } yield composite
+    } yield finalRes
+  }
+
   private def getCurDateSeconds: String = (System.currentTimeMillis / 1000).toString
   private def getDay: String = {
     val format = new SimpleDateFormat("M/d/y")
-    format.format(Calendar.getInstance().getTime())
+    format.format(Calendar.getInstance.getTime)
   }
 
   def upsertSummary(pid: String, sum: String): Future[Int] = {
@@ -138,25 +178,11 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
   }
 
   def addComment(pid: String, text: String): Future[Int] = {
-    val comment = Document("id" -> pid, "votes" -> 0, "date" -> getDay, "text" -> text)
+    val comment = Document("id" -> BsonObjectId.apply.getValue.toString, "votes" -> 0, "date" -> getDay, "text" -> text)
 
     for {
-      pushRes <- collection.findOneAndUpdate(equal("pid", pid), push("rComments", comment), upstF).toFuture
-      numComments <- if(pushRes == null) Future{0} else {
-        pushRes.head.get("rComments") match {
-          case Some(rComments) => if(rComments.isArray) Future{rComments.asArray.size} else Future{0}
-          case _ => Future{0}
-        }
-      }
-      action <-
-        if(numComments <= 0) Future{CommentAddAction(false, true)}
-        else if(numComments <= MAX_RECENT_COMMENTS) Future{CommentAddAction(false, false)}
-        else Future{CommentAddAction(true, false)}
-      addCommentRes <-
-        if(action.failed) Future{Seq[UpdateResult](UpdateResult.unacknowledged)}
-        else if(action.needAdjust) collection.updateOne(equal("pid", pid), popFirst("rComments")).toFuture
-        else Future{Seq[UpdateResult](UpdateResult.acknowledged(0, 0.toLong, BsonNumber(0)))}
-      finalRes <- if(addCommentRes.head.wasAcknowledged) Future{1} else Future{0}
+      pushRes <- collection.updateOne(equal("pid", pid), pushEach("rComments", rPushOpt, comment), upst).toFuture
+      finalRes <- if(pushRes.head.wasAcknowledged) Future{1} else Future{0}
     } yield finalRes
   }
 

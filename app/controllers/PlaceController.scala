@@ -140,14 +140,14 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
   val upvoteCommentForm: Form[UpvoteCommentForm] = Form {
     mapping(
       "ID" -> nonEmptyText,
-      "CID" -> bigDecimal
+      "CID" -> nonEmptyText
     )(UpvoteCommentForm.apply)(UpvoteCommentForm.unapply)
   }
 
   val downvoteCommentForm: Form[DownvoteCommentForm] = Form {
     mapping(
       "ID" -> nonEmptyText,
-      "CID" -> bigDecimal
+      "CID" -> nonEmptyText
     )(DownvoteCommentForm.apply)(DownvoteCommentForm.unapply)
   }
 
@@ -240,7 +240,7 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
         }
       },
       p => {
-        repo.upvoteComment(p.pid, p.cid.toString).map { res =>
+        repo.upvoteComment(p.pid, p.cid).map { res =>
           Ok(res.toString)
         } recover {
           case _ => ServiceUnavailable("Database query failed")
@@ -259,7 +259,7 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
         }
       },
       p => {
-        repo.downvoteComment(p.pid, p.cid.toString).map { res =>
+        repo.downvoteComment(p.pid, p.cid).map { res =>
           Ok(res.toString)
         } recover {
           case _ => ServiceUnavailable("Database query failed")
@@ -274,5 +274,5 @@ case class GetDetailsForm(pid: String, name: String)
 case class ChangeURLForm(pid: String, url: String)
 case class ChangePhotoForm(pid: String, url: String)
 case class PostCommentForm(pid: String, text: String)
-case class UpvoteCommentForm(pid: String, cid: BigDecimal)
-case class DownvoteCommentForm(pid: String, cid: BigDecimal)
+case class UpvoteCommentForm(pid: String, cid: String)
+case class DownvoteCommentForm(pid: String, cid: String)

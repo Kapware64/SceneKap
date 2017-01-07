@@ -20,7 +20,7 @@ class Details(ecp: ExecutionContext, repo: PlaceRepo) {
     def procRes(res: Option[Place]): (String, String, String, String, String) = {
       res match {
         case Some(p) => (p.website, p.summary, p.last_summary_mod, p.rComments, p.tComments)
-        case None => ("", "", "", "", "")
+        case None => ("", "", "", "[]", "[]")
       }
     }
 
