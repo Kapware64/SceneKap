@@ -28,6 +28,7 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
   val MONGO_SERVER_SELECTION_TIMEOUT: Int = appConf.getInt("mongoConnections.serverSelectionTimeoutMS")
 
   val MAX_COMMENTS: Int = appConf.getInt("comments.maxComments")
+  val COMMENT_DELETE_CUTOFF: Int = appConf.getInt("comments.deleteCutoff")
   val DEFAULT_COMMENT: Document = Document("id" -> "", "votes" -> -10000, "date" -> "", "text" -> "")
 
   val strConf: String = "mongodb://localhost/?connectTimeoutMS=" + MONGO_CONNECT_TIMEOUT + "&socketTimeoutMS=" + MONGO_SOCKET_TIMEOUT + "&serverSelectionTimeoutMS=" + MONGO_SERVER_SELECTION_TIMEOUT
@@ -108,13 +109,15 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
   private def voteComment(pid: String, cid: String, voteVal: Int): Future[Int] = {
     for {
       rRes <- collection.updateOne(and(equal("pid", pid), equal("rComments.id", cid)), combine(inc("rComments.$.votes", voteVal), set("tSorted", false))).toFuture
+      delRes <- if(voteVal < 0) collection.updateOne(and(equal("pid", pid), equal("rComments.id", cid)), pull("rComments", lte("votes", -5))).toFuture else Future{rRes}
       finalRes <- if(rRes.head.wasAcknowledged) Future{1} else Future{0}
     } yield finalRes
   }
 
   private def getCurDateSeconds: String = (System.currentTimeMillis / 1000).toString
+
   private def getDay: String = {
-    val format = new SimpleDateFormat("M/d/y")
+    val format: SimpleDateFormat = new SimpleDateFormat("MMM d y, h:mm a")
     format.format(Calendar.getInstance.getTime)
   }
 
