@@ -5,6 +5,7 @@ import java.util.Calendar
 import javax.inject.{Inject, Singleton}
 
 import com.mongodb.client.model.FindOneAndUpdateOptions
+import com.typesafe.config.ConfigFactory
 import play.api.db.slick.DatabaseConfigProvider
 import models.Place
 import org.mongodb.scala.bson.{BsonObjectId, _}
@@ -16,17 +17,23 @@ import org.mongodb.scala.{MongoClient, MongoCollection, MongoDatabase}
 import org.mongodb.scala.model.Indexes._
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.collection.JavaConversions._
 
 @Singleton
 class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec: ExecutionContext) {
-  val strConf: String = "mongodb://localhost/?connectTimeoutMS=7500&socketTimeoutMS=7500&serverSelectionTimeoutMS=10000"
+  val appConf = ConfigFactory.load
+
+  val MONGO_CONNECT_TIMEOUT: Int = appConf.getInt("mongoConnections.connectTimeoutMS")
+  val MONGO_SOCKET_TIMEOUT: Int = appConf.getInt("mongoConnections.socketTimeoutMS")
+  val MONGO_SERVER_SELECTION_TIMEOUT: Int = appConf.getInt("mongoConnections.serverSelectionTimeoutMS")
+
+  val MAX_COMMENTS: Int = appConf.getInt("comments.maxComments")
+  val DEFAULT_COMMENT: Document = Document("id" -> "", "votes" -> -10000, "date" -> "", "text" -> "")
+
+  val strConf: String = "mongodb://localhost/?connectTimeoutMS=" + MONGO_CONNECT_TIMEOUT + "&socketTimeoutMS=" + MONGO_SOCKET_TIMEOUT + "&serverSelectionTimeoutMS=" + MONGO_SERVER_SELECTION_TIMEOUT
   val mongoClient: MongoClient = MongoClient(strConf)
   val database: MongoDatabase = mongoClient.getDatabase("SK")
   val collection: MongoCollection[Document] = database.getCollection("places")
-
-  val MAX_RECENT_COMMENTS: Int = 5
-  val MAX_TOP_COMMENTS: Int = 3
-  val DEFAULT_COMMENT: Document = Document("id" -> "", "votes" -> -10000, "date" -> "", "text" -> "")
 
   val upst: UpdateOptions = new UpdateOptions
   val after: FindOneAndUpdateOptions = new FindOneAndUpdateOptions
@@ -35,10 +42,8 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
 
   upst.upsert(true)
   after.returnDocument(ReturnDocument.AFTER)
-  after.upsert(true)
-  rPushOpt.slice(-1 * MAX_RECENT_COMMENTS)
+  rPushOpt.slice(-1 * MAX_COMMENTS)
   tPushOpt.sortDocument(descending("votes"))
-  tPushOpt.slice(MAX_TOP_COMMENTS)
 
   collection.createIndex(ascending("pid"))
   collection.createIndex(compoundIndex(ascending("pid"), ascending("rComments.id")))
@@ -75,37 +80,35 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
     helper(docs.reverse, List[Place]())
   }
 
-  private def getArrFieldAsList(doc: Document, field: String): List[Document] = {
-    def proc(arr: BsonArray): List[Document] = {
+  private def getArrFieldAsJson(doc: Document, keyword: String): String = {
+    def jsonizeArr(arr: BsonArray): String = {
       val size = arr.size
 
-      def helper(ind: Int, acc: List[Document]): List[Document] = {
-        if(ind >= size) acc
-        else helper(ind + 1, arr.get(ind).asDocument :: acc)
+      def helper(ind: Int, acc: String): String = {
+        if(ind >= size) acc + "]"
+        else helper(ind + 1, acc + "," + arr.get(ind).asDocument.toJson)
       }
 
-      helper(0, List[Document]())
+      if(size == 0) "[]" else helper(0, "").replaceFirst(",", "[")
     }
 
-    doc.get(field) match {
-      case Some(res) => proc(res.asArray)
-      case _ => List[Document]()
+    doc.get(keyword) match {
+      case Some(res) => jsonizeArr(res.asArray)
+      case _ => "[]"
+    }
+  }
+
+  private def getArrField(doc: Document, keyword: String): Seq[BsonValue] = {
+    doc.get(keyword) match {
+      case Some(res) => res.asArray.getValues
+      case _ => Seq[BsonValue]()
     }
   }
 
   private def voteComment(pid: String, cid: String, voteVal: Int): Future[Int] = {
-    if(voteVal > 0) after.projection(elemMatch("rComments", equal("id", cid))) else after.projection(null)
-
     for {
-      toPush <- collection.findOneAndUpdate(and(equal("pid", pid), equal("rComments.id", cid)), inc("rComments.$.votes", voteVal), after).toFuture
-      tRes <- collection.updateOne(and(equal("pid", pid), equal("tComments.id", cid)), inc("tComments.$.votes", voteVal)).toFuture
-      finalRes <-
-      if((tRes.head.getMatchedCount.toInt > 0 && voteVal > 0) || (tRes.head.getMatchedCount.toInt == 0 && voteVal < 0)) Future{1}
-      else for {
-        addRes <- collection.updateOne(equal("pid", pid), addEachToSet("tComments", getArrFieldAsList(toPush.head, "rComments"): _*)).toFuture
-        sortRes <- collection.updateOne(equal("pid", pid), pushEach("tComments", tPushOpt, List[Document](): _*)).toFuture
-        composite <- if(addRes.head.wasAcknowledged && sortRes.head.wasAcknowledged) Future{1} else Future{0}
-      } yield composite
+      rRes <- collection.updateOne(and(equal("pid", pid), equal("rComments.id", cid)), combine(inc("rComments.$.votes", voteVal), set("tSorted", false))).toFuture
+      finalRes <- if(rRes.head.wasAcknowledged) Future{1} else Future{0}
     } yield finalRes
   }
 
@@ -138,29 +141,22 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
     } yield finalRes
   }
 
-  def getArrFieldAsJson(doc: Document, keyword: String): String = {
-    def jsonizeArr(arr: BsonArray): String = {
-      val size = arr.size
-
-      def helper(ind: Int, acc: String): String = {
-        if(ind >= size) acc + "]"
-        else helper(ind + 1, acc + "," + arr.get(ind).asDocument.toJson)
-      }
-
-      helper(0, "").replaceFirst(",", "[")
-    }
-
-    doc.get(keyword) match {
-      case Some(res) => jsonizeArr(res.asArray)
-      case _ => "[]"
-    }
-  }
-
   def get(pid: String): Future[Option[Place]] = {
     for {
       res <- collection.find(equal("pid", pid)).first.toFuture
-      place <- if(res.isEmpty) Future{None} else Future{convDecToPlace(res.head)}
-    } yield place
+      sRes <- {
+        if(res.isEmpty) Future{res}
+        else {
+          val tSorted = res.head.getBoolean("tSorted")
+          if(tSorted != null && tSorted) Future{res}
+          else for {
+            clear <- collection.updateOne(equal("pid", pid), set("tComments", List[Document]())).toFuture
+            sorted <- collection.findOneAndUpdate(equal("pid", pid), combine(pushEach("tComments", tPushOpt, getArrField(res.head, "rComments"): _*), set("tSorted", true)), after).toFuture
+          } yield sorted
+        }
+      }
+      finalRes <- if(sRes.isEmpty) Future{None} else Future{convDecToPlace(sRes.head)}
+    } yield finalRes
   }
 
   def getMult(pids: List[String]): Future[List[Place]] = {
@@ -181,8 +177,8 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
     val comment = Document("id" -> BsonObjectId.apply.getValue.toString, "votes" -> 0, "date" -> getDay, "text" -> text)
 
     for {
-      pushRes <- collection.updateOne(equal("pid", pid), pushEach("rComments", rPushOpt, comment), upst).toFuture
-      finalRes <- if(pushRes.head.wasAcknowledged) Future{1} else Future{0}
+      rRes <- collection.updateOne(equal("pid", pid), combine(pushEach("rComments", rPushOpt, comment), set("tSorted", false)), upst).toFuture
+      finalRes <- if(rRes.head.wasAcknowledged) Future{1} else Future{0}
     } yield finalRes
   }
 

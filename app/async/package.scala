@@ -1,3 +1,5 @@
+import scala.collection.JavaConversions._
+import com.typesafe.config.ConfigFactory
 import de.l3s.boilerpipe.extractors.KeepEverythingExtractor
 import play.api.libs.json._
 
@@ -7,17 +9,21 @@ import scala.io
   * Created by NoahKaplan on 10/26/16.
   */
 package object async {
-  val ABOUT_LINK_KEYWORDS: List[String] = List[String]("ABOUT")
-  val ABOUT_KEYWORDS: List[String] = List[String]("WE", "OUR", "WAS", "ESTABLISHED", "FOUNDED")
-  val EMPTY_KEYWORDS: List[String] = List[String]("AND", "THE")
-  val CONNECT_TIMEOUT = 5000
-  val READ_TIMEOUT = 5000
-  val MAX_PHOTO_WIDTH = 400
-  val GP_KEY = "AIzaSyBuZtwpHo3XQpxPOFjALeUgazV_QxZudUU"
-  val GP_KEY_DET = "AIzaSyAls_qyBvY6SG919zH7S3Iy9RMBbfypRgw"
+  val appConf = ConfigFactory.load
+
+  val ABOUT_LINK_KEYWORDS: Seq[String] = appConf.getStringList("keywords.aboutLink")
+  val ABOUT_KEYWORDS: Seq[String] = appConf.getStringList("keywords.aboutDesc")
+  val EMPTY_KEYWORDS: Seq[String] = appConf.getStringList("keywords.fillers")
+  val CONNECT_TIMEOUT = appConf.getInt("website.connectTimeoutMS")
+  val READ_TIMEOUT = appConf.getInt("website.readTimeoutMS")
+  val MAX_PHOTO_WIDTH = appConf.getInt("photo.maxWidth")
+  val GP_KEY = appConf.getString("googlePlaces.key")
+  val GP_KEY_DET = appConf.getString("googlePlaces.detKey")
+
+  println("KEYWORDS: " + ABOUT_KEYWORDS)
 
   def calcSumScore(placeName: String, sum: String, about: Boolean): Int = {
-    def helper(relWords: List[String], textWords: List[String], acc: Int, mult: Int): Int = {
+    def helper(relWords: Seq[String], textWords: List[String], acc: Int, mult: Int): Int = {
       if(relWords.isEmpty) acc
       else {
         val curWordsUpper = relWords.head.toUpperCase
@@ -25,7 +31,7 @@ package object async {
       }
     }
 
-    def remEmptyWords(words: List[String], eWords: List[String], acc: List[String]): List[String] = {
+    def remEmptyWords(words: List[String], eWords: Seq[String], acc: List[String]): List[String] = {
       if(words.isEmpty) acc
       else if(eWords.contains(words.head.toUpperCase)) remEmptyWords(words.tail, eWords, acc)
       else remEmptyWords(words.tail, eWords, words.head :: acc)
