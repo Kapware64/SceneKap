@@ -1,11 +1,7 @@
 package async
 
-import de.l3s.boilerpipe.extractors.ArticleSentencesExtractor
-
 import scala.concurrent.{ExecutionContext, Future}
 import play.api.libs.json._
-import org.htmlcleaner.{HtmlCleaner, TagNode}
-import java.net.URL
 
 import db.PlaceRepo
 import models.Place
@@ -44,72 +40,16 @@ class Details(ecp: ExecutionContext, repo: PlaceRepo) {
     }
   }
 
-  private def getAboutLink(html: String, url: String): String = {
-    val cleaner = new HtmlCleaner
-    val elements = cleaner.clean(html).getElementsByName("a", true)
-
-    def loop(l: List[TagNode]): String = {
-      if(l.isEmpty) ""
-      else if(ABOUT_LINK_KEYWORDS.exists(l.head.getText.toString.toUpperCase.contains)) l.head.getAttributeByName("href")
-      else loop(l.tail)
-    }
-
-    def correctURL(raw: String, sUrl: String): String = {
-      if(raw == "") raw
-      else if(!raw.contains("//")) {
-        try {
-          val url:URL = new URL(sUrl)
-          if(raw.charAt(0) == '/') url.getProtocol + "://" + url.getHost + raw
-          else url.getProtocol + "://" + url.getHost + "/" + raw
-        }
-        catch { case e: java.net.MalformedURLException => "" }
-      }
-      else raw
-    }
-
-    correctURL(loop(elements.toList), url)
-  }
-
-  private def getBetterSummary(placeName: String, sum1: String, sum2:String): String = {
-    if(sum2 == "") sum1
-    else if(sum1 == "") sum2
-    else {
-      val score1: Int = calcSumScore(placeName, sum1, true)
-      val score2: Int = calcSumScore(placeName, sum2, true)
-
-      if(score2 > score1) sum2
-      else sum1
-    }
-  }
-
   def setNewSum(summary: String, pid: String): Future[Int] = {
     repo.upsertSummary(pid, summary)
   }
 
-  def getDetailsJson(pid: String, name: String): Future[String] = {
-    def helper(url: String, pSum: String, base: Boolean): Future[(String, String)] = Future {
-      def failRet(base: Boolean) = if(base) ("", "") else (pSum, "")
-
-      if(url.isEmpty) failRet(base)
-      else {
-        try {
-          val raw = get(url)
-
-          if(base) (ArticleSentencesExtractor.INSTANCE.getText(raw).replaceAll("\\s+", " "), getAboutLink(raw, url))
-          else (getBetterSummary(name, pSum, ArticleSentencesExtractor.INSTANCE.getText(raw).replaceAll("\\s+", " ")), "")
-        } catch {
-          case ioe: java.io.IOException => failRet(base)
-          case ste: java.net.SocketTimeoutException => failRet(base)
-        }
-      }
-    }
-
+  def getDetailsJson(pid: String, placeKeywords: String): Future[String] = {
     for {
       (url1, dbSum, dbSumMod, rComments, tComments) <- getDBInfo(pid)
       url2 <- if(url1 == "") getGoogWebsite(pid) else Future {url1}
-      (s1, aUrl) <- if(dbSum == "" || sumModDateExp(dbSumMod)) helper(url2, "", true) else Future{(dbSum, "")}
-      (s2, _) <- helper(aUrl, s1, false)
-      i <- if(sumModDateExp(dbSumMod)) setNewSum(s2, pid) else Future {0}
-    } yield "{ " + "\"summary\" : \"" + s2 + "\", \"rComments\" : " + rComments + ", \"tComments\" : " + tComments + " }"
+      (sum, _) <- calcUrlSumAndScore(placeKeywords, url2)
+      i <- if(sumModDateExp(dbSumMod)) setNewSum(sum, pid) else Future {0}
+    } yield "{ " + "\"summary\" : \"" + sum + "\", \"rComments\" : " + rComments + ", \"tComments\" : " + tComments + " }"
   }
 }

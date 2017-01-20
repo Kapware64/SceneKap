@@ -31,7 +31,7 @@
                 <div class="three columns">
                     @form(routes.PlaceController.detailsBtn()) {
                         @inputText(detForm("ID"))
-                        @inputText(detForm("Name"))
+                        @inputText(detForm("Keywords"))
 
                         <div class="buttons">
                             <input type="submit" value="Details"/>
@@ -43,6 +43,7 @@
                 <div class="three columns">
                     @form(routes.PlaceController.urlBtn()) {
                         @inputText(urlForm("ID"))
+                        @inputText(urlForm("Keywords"))
                         @inputText(urlForm("URL"))
 
                         <div class="buttons">

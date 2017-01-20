@@ -1,5 +1,6 @@
 package db
 
+import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import javax.inject.{Inject, Singleton}
@@ -18,6 +19,8 @@ import org.mongodb.scala.model.Indexes._
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.collection.JavaConversions._
+import async.calcUrlSumAndScore
+import com.mongodb.client.result.UpdateResult
 
 @Singleton
 class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec: ExecutionContext) {
@@ -30,6 +33,8 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
   val MAX_COMMENTS: Int = appConf.getInt("comments.maxComments")
   val COMMENT_DELETE_CUTOFF: Int = appConf.getInt("comments.deleteCutoff")
   val DEFAULT_COMMENT: Document = Document("id" -> "", "votes" -> -10000, "date" -> "", "text" -> "")
+
+  val MIN_SUM_SCORE: Int = appConf.getInt("website.minSumScore")
 
   val strConf: String = "mongodb://localhost/?connectTimeoutMS=" + MONGO_CONNECT_TIMEOUT + "&socketTimeoutMS=" + MONGO_SOCKET_TIMEOUT + "&serverSelectionTimeoutMS=" + MONGO_SERVER_SELECTION_TIMEOUT
   val mongoClient: MongoClient = MongoClient(strConf)
@@ -130,10 +135,26 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
     } yield finalRes
   }
 
-  def upsertWebsite(pid:String, url: String): Future[Int] = {
+  def upsertWebsite(placeKeywords: String, pid: String, url: String): Future[Int] = {
     for {
-      updateRes <- collection.updateOne(equal("pid", pid), combine(set("website", url), set("last_summary_mod", "0")), upst).toFuture
-      finalRes <- if(updateRes.head.wasAcknowledged) Future{1} else Future{0}
+      baseUrl <- {
+        try {
+          val urlObj: URL = new URL(url)
+          Future{urlObj.getProtocol + "://" + urlObj.getHost}
+        } catch { case e: java.net.MalformedURLException => Future{""}}
+      }
+      (_, score) <- {
+        println("URL: " + url)
+        println("BASE URL: " + baseUrl)
+        println("Place keywords: " + placeKeywords)
+        if(baseUrl.isEmpty) Future{("", 0)} else calcUrlSumAndScore(placeKeywords, baseUrl, false, false)
+      }
+      upsertRes <- {
+        println("SCORE: " + score)
+        if(score < MIN_SUM_SCORE) Future{Seq[UpdateResult](UpdateResult.unacknowledged())}
+        else collection.updateOne(equal("pid", pid), combine(set("website", url), set("last_summary_mod", "0")), upst).toFuture
+      }
+      finalRes <- if(score < MIN_SUM_SCORE) Future{-1} else if(upsertRes.head.wasAcknowledged) Future{1} else Future{0}
     } yield finalRes
   }
 

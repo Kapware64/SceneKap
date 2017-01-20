@@ -46,16 +46,16 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     }
   }
 
-  def details(pid: String, name: String) = Action.async {
-    getDetails.getDetailsJson(pid: String, name: String).map { det =>
+  def details(pid: String, placeKeywords: String) = Action.async {
+    getDetails.getDetailsJson(pid: String, placeKeywords: String).map { det =>
       Ok(det)
     } recover {
       case _ => ServiceUnavailable("Database query failed")
     }
   }
 
-  def changeWebsite(pid: String, url: String) = Action.async {
-    repo.upsertWebsite(pid, url).map { res =>
+  def changeWebsite(pid: String, placeKeywords: String, url: String) = Action.async {
+    repo.upsertWebsite(placeKeywords, pid, url).map { res =>
       Ok(res.toString)
     } recover {
       case _ => ServiceUnavailable("Database query failed")
@@ -112,13 +112,14 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
   val detForm: Form[GetDetailsForm] = Form {
     mapping(
       "ID" -> nonEmptyText,
-      "Name" -> nonEmptyText
+      "Keywords" -> nonEmptyText
     )(GetDetailsForm.apply)(GetDetailsForm.unapply)
   }
 
   val changeURLForm: Form[ChangeURLForm] = Form {
     mapping(
       "ID" -> nonEmptyText,
+      "Keywords" -> nonEmptyText,
       "URL" -> nonEmptyText
     )(ChangeURLForm.apply)(ChangeURLForm.unapply)
   }
@@ -168,7 +169,7 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
         Ok(views.html.index(llForm)(errorForm)(changeURLForm)(changePhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
       },
       p => {
-        Redirect("/details/" + p.pid + "/" + p.name)
+        Redirect("/details/" + p.pid + "/" + p.placeKeywords)
       }
     )
   }
@@ -183,7 +184,7 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
         }
       },
       p => {
-        repo.upsertWebsite(p.pid, p.url).map { res =>
+        repo.upsertWebsite(p.placeKeywords, p.pid, p.url).map { res =>
           Ok(res.toString)
         } recover {
           case _ => ServiceUnavailable("Database query failed")
@@ -270,8 +271,8 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
 }
 
 case class CreateNearbyForm(lat: BigDecimal, long: BigDecimal)
-case class GetDetailsForm(pid: String, name: String)
-case class ChangeURLForm(pid: String, url: String)
+case class GetDetailsForm(pid: String, placeKeywords: String)
+case class ChangeURLForm(pid: String, placeKeywords: String, url: String)
 case class ChangePhotoForm(pid: String, url: String)
 case class PostCommentForm(pid: String, text: String)
 case class UpvoteCommentForm(pid: String, cid: String)
