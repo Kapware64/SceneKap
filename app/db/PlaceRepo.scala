@@ -20,6 +20,7 @@ import org.mongodb.scala.model.Indexes._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.collection.JavaConversions._
 import async.calcUrlSumAndScore
+import async.detCommentProfanity
 import com.mongodb.client.result.UpdateResult
 
 @Singleton
@@ -199,10 +200,13 @@ class PlaceRepo @Inject()(dbConfigProvider: DatabaseConfigProvider)(implicit ec:
 
   def addComment(pid: String, text: String): Future[Int] = {
     val comment = Document("id" -> BsonObjectId.apply.getValue.toString, "votes" -> 0, "date" -> getDay, "text" -> text)
+    val isProfane = detCommentProfanity(text)
 
     for {
-      rRes <- collection.updateOne(equal("pid", pid), combine(pushEach("rComments", rPushOpt, comment), set("tSorted", false)), upst).toFuture
-      finalRes <- if(rRes.head.wasAcknowledged) Future{1} else Future{0}
+      rRes <-
+        if(isProfane) Future{Seq[UpdateResult](UpdateResult.unacknowledged())}
+        else collection.updateOne(equal("pid", pid), combine(pushEach("rComments", rPushOpt, comment), set("tSorted", false)), upst).toFuture
+      finalRes <- if(isProfane) Future{-1} else if(rRes.head.wasAcknowledged) Future{1} else Future{0}
     } yield finalRes
   }
 

@@ -18,12 +18,22 @@ package object async {
 
   val ABOUT_LINK_KEYWORDS: Seq[String] = appConf.getStringList("keywords.aboutLink")
   val ABOUT_KEYWORDS: Seq[String] = appConf.getStringList("keywords.aboutDesc")
+  val ZERO_KEYWORDS: Seq[String] = appConf.getStringList("keywords.autoZero")
+  val BAD_KEYWORDS: Seq[String] = appConf.getStringList("keywords.badWords")
   val EMPTY_KEYWORDS: Seq[String] = appConf.getStringList("keywords.fillers")
   val CONNECT_TIMEOUT = appConf.getInt("website.connectTimeoutMS")
   val READ_TIMEOUT = appConf.getInt("website.readTimeoutMS")
   val MAX_PHOTO_WIDTH = appConf.getInt("photo.maxWidth")
   val GP_KEY = appConf.getString("googlePlaces.key")
   val GP_KEY_DET = appConf.getString("googlePlaces.detKey")
+
+  private def calcMatchingWords(relWords: Seq[String], textWords: List[String], acc: Int, mult: Int): Int = {
+    if(relWords.isEmpty) acc
+    else {
+      val curWordsUpper = relWords.head.toUpperCase
+      calcMatchingWords(relWords.tail, textWords, acc + textWords.count(_.toUpperCase == curWordsUpper) * mult, mult)
+    }
+  }
 
   def getAboutLink(html: String, url: String): String = {
     val cleaner = new HtmlCleaner
@@ -59,15 +69,11 @@ package object async {
     else (sum2, score2)
   }
 
-  def calcSumScore(placeKeywords: String, sum: String, about: Boolean): Int = {
-    def helper(relWords: Seq[String], textWords: List[String], acc: Int, mult: Int): Int = {
-      if(relWords.isEmpty) acc
-      else {
-        val curWordsUpper = relWords.head.toUpperCase
-        helper(relWords.tail, textWords, acc + textWords.count(_.toUpperCase == curWordsUpper) * mult, mult)
-      }
-    }
+  def detCommentProfanity(comment: String): Boolean = {
+    if(calcMatchingWords(BAD_KEYWORDS, comment.split("\\s+").toList, 0, 1) > 0) true else false
+  }
 
+  def calcSumScore(placeKeywords: String, sum: String, about: Boolean): Int = {
     def remEmptyWords(words: List[String], eWords: Seq[String], acc: List[String]): List[String] = {
       if(words.isEmpty) acc
       else if(eWords.contains(words.head.toUpperCase)) remEmptyWords(words.tail, eWords, acc)
@@ -76,8 +82,12 @@ package object async {
 
     val placeWords = remEmptyWords(placeKeywords.split("\\s+").toList, EMPTY_KEYWORDS, List[String]())
     val numPlaceWords = placeWords.size
-    val aboutScore = if(about) helper(ABOUT_KEYWORDS, sum.split("\\s+").toList, 0, numPlaceWords / 2) else 0
-    helper(placeWords, sum.split("\\s+").toList, 0, 1) + aboutScore
+    val sumWords = sum.split("\\s+").toList
+    if(calcMatchingWords(ZERO_KEYWORDS, sumWords, 0, 1) <= 0) {
+      val aboutScore = if(about) calcMatchingWords(ABOUT_KEYWORDS, sumWords, 0, numPlaceWords / 2) else 0
+      calcMatchingWords(placeWords, sum.split("\\s+").toList, 0, 1) + aboutScore
+    }
+    else 0
   }
 
   //[modDate] is seconds since 1990

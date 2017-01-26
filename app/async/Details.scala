@@ -49,7 +49,8 @@ class Details(ecp: ExecutionContext, repo: PlaceRepo) {
       (url1, dbSum, dbSumMod, rComments, tComments) <- getDBInfo(pid)
       url2 <- if(url1 == "") getGoogWebsite(pid) else Future {url1}
       (sum, _) <- calcUrlSumAndScore(placeKeywords, url2)
+
       i <- if(sumModDateExp(dbSumMod)) setNewSum(sum, pid) else Future {0}
-    } yield "{ " + "\"summary\" : \"" + sum + "\", \"rComments\" : " + rComments + ", \"tComments\" : " + tComments + " }"
+    } yield "{ " + "\"summary\" : \"" + sum.replace("\"", "\\\"") + "\", \"rComments\" : " + rComments + ", \"tComments\" : " + tComments + " }"
   }
 }
