@@ -17,7 +17,7 @@ import play.api.libs.json.{Json, Writes}
   * Created by NoahKaplan on 10/25/16.
   */
 class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
-                                 (implicit ec: ExecutionContext) extends Controller with I18nSupport {
+                                (implicit ec: ExecutionContext) extends Controller with I18nSupport {
   val findNearby = new FindNearby(ec, repo)
   val getDetails = new Details(ec, repo)
 
@@ -27,7 +27,8 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
       "rComments" -> Json.parse(p.rComments),
       "tComments" -> Json.parse(p.tComments),
       "website" -> p.website,
-      "photo_uri" -> p.photo_uri,
+      "rPhotoUris" -> p.rPhotoUris,
+      "tPhotoUris" -> p.tPhotoUris,
       "summary" -> p.summary,
       "last_summary_mod" -> p.last_summary_mod,
       "extra" -> p.extra
@@ -35,7 +36,7 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
   }
 
   def index = Action {
-    Ok(views.html.index(llForm)(detForm)(changeURLForm)(changePhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
+    Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
   }
 
   def nearby(lat: String, long: String) = Action.async {
@@ -62,8 +63,24 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     }
   }
 
-  def changePhoto(pid: String, url: String) = Action.async {
-    repo.upsertPhoto(pid, url).map { res =>
+  def addPhoto(pid: String, url: String) = Action.async {
+    repo.addPhoto(pid, url).map { res =>
+      Ok(res.toString)
+    } recover {
+      case _ => ServiceUnavailable("Database query failed")
+    }
+  }
+
+  def upvotePhoto(pid: String, cid: String) = Action.async {
+    repo.upvotePhoto(pid, cid).map { res =>
+      Ok(res.toString)
+    } recover {
+      case _ => ServiceUnavailable("Database query failed")
+    }
+  }
+
+  def downvotePhoto(pid: String, cid: String) = Action.async {
+    repo.downvotePhoto(pid, cid).map { res =>
       Ok(res.toString)
     } recover {
       case _ => ServiceUnavailable("Database query failed")
@@ -124,11 +141,25 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     )(ChangeURLForm.apply)(ChangeURLForm.unapply)
   }
 
-  val changePhotoForm: Form[ChangePhotoForm] = Form {
+  val addPhotoForm: Form[AddPhotoForm] = Form {
     mapping(
       "ID" -> nonEmptyText,
       "URL" -> nonEmptyText
-    )(ChangePhotoForm.apply)(ChangePhotoForm.unapply)
+    )(AddPhotoForm.apply)(AddPhotoForm.unapply)
+  }
+
+  val upvotePhotoForm: Form[UpvotePhotoForm] = Form {
+    mapping(
+      "ID" -> nonEmptyText,
+      "CID" -> nonEmptyText
+    )(UpvotePhotoForm.apply)(UpvotePhotoForm.unapply)
+  }
+
+  val downvotePhotoForm: Form[DownvotePhotoForm] = Form {
+    mapping(
+      "ID" -> nonEmptyText,
+      "CID" -> nonEmptyText
+    )(DownvotePhotoForm.apply)(DownvotePhotoForm.unapply)
   }
 
   val postCommentForm: Form[PostCommentForm] = Form {
@@ -155,7 +186,7 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
   def nearbyBtn = Action { implicit request =>
     llForm.bindFromRequest.fold(
       errorForm => {
-        Ok(views.html.index(errorForm)(detForm)(changeURLForm)(changePhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
+        Ok(views.html.index(errorForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
       },
       coord => {
         Redirect("/nearby/" + coord.lat + "/" + coord.long)
@@ -166,7 +197,7 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
   def detailsBtn = Action { implicit request =>
     detForm.bindFromRequest.fold(
       errorForm => {
-        Ok(views.html.index(llForm)(errorForm)(changeURLForm)(changePhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
+        Ok(views.html.index(llForm)(errorForm)(changeURLForm)(addPhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
       },
       p => {
         Redirect("/details/" + p.pid + "/" + p.placeKeywords)
@@ -178,7 +209,7 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     changeURLForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(errorForm)(changePhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
+          Ok(views.html.index(llForm)(detForm)(errorForm)(addPhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
@@ -193,8 +224,8 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     )
   }
 
-  def photoBtn = Action.async { implicit request =>
-    changePhotoForm.bindFromRequest.fold(
+  def addPhotoBtn = Action.async { implicit request =>
+    addPhotoForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
           Ok(views.html.index(llForm)(detForm)(changeURLForm)(errorForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
@@ -203,7 +234,7 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
         }
       },
       p => {
-        repo.upsertPhoto(p.pid, p.url).map { res =>
+        repo.addPhoto(p.pid, p.url).map { res =>
           Ok(res.toString)
         } recover {
           case _ => ServiceUnavailable("Database query failed")
@@ -216,7 +247,7 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     postCommentForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(changeURLForm)(changePhotoForm)(errorForm)(upvoteCommentForm)(downvoteCommentForm))
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(errorForm)(upvoteCommentForm)(downvoteCommentForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
@@ -235,7 +266,7 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     upvoteCommentForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(changeURLForm)(changePhotoForm)(postCommentForm)(errorForm)(downvoteCommentForm))
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(errorForm)(downvoteCommentForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
@@ -254,7 +285,7 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     downvoteCommentForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(changeURLForm)(changePhotoForm)(postCommentForm)(upvoteCommentForm)(errorForm))
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(upvoteCommentForm)(errorForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
@@ -268,12 +299,52 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
       }
     )
   }
+
+  def upvotePhotoBtn = Action.async { implicit request =>
+    upvotePhotoForm.bindFromRequest.fold(
+      errorForm => {
+        repo.list().map { _ =>
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
+        }
+      },
+      p => {
+        repo.upvotePhoto(p.pid, p.cid).map { res =>
+          Ok(res.toString)
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
+        }
+      }
+    )
+  }
+
+  def downvotePhotoBtn = Action.async { implicit request =>
+    downvotePhotoForm.bindFromRequest.fold(
+      errorForm => {
+        repo.list().map { _ =>
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
+        }
+      },
+      p => {
+        repo.downvotePhoto(p.pid, p.cid).map { res =>
+          Ok(res.toString)
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
+        }
+      }
+    )
+  }
 }
 
 case class CreateNearbyForm(lat: BigDecimal, long: BigDecimal)
 case class GetDetailsForm(pid: String, placeKeywords: String)
 case class ChangeURLForm(pid: String, placeKeywords: String, url: String)
-case class ChangePhotoForm(pid: String, url: String)
+case class AddPhotoForm(pid: String, url: String)
+case class UpvotePhotoForm(pid: String, cid: String)
+case class DownvotePhotoForm(pid: String, cid: String)
 case class PostCommentForm(pid: String, text: String)
 case class UpvoteCommentForm(pid: String, cid: String)
 case class DownvoteCommentForm(pid: String, cid: String)

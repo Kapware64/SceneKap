@@ -12,11 +12,11 @@ import models.Place
 class Details(ecp: ExecutionContext, repo: PlaceRepo) {
   implicit val ec = ecp
 
-  private def getDBInfo(pid: String): Future[(String, String, String, String, String)] = {
-    def procRes(res: Option[Place]): (String, String, String, String, String) = {
+  private def getDBInfo(pid: String): Future[(String, String, String, String, String, String, String)] = {
+    def procRes(res: Option[Place]): (String, String, String, String, String, String, String) = {
       res match {
-        case Some(p) => (p.website, p.summary, p.last_summary_mod, p.rComments, p.tComments)
-        case None => ("", "", "", "[]", "[]")
+        case Some(p) => (p.website, p.summary, p.last_summary_mod, p.rComments, p.tComments, p.rPhotoUris, p.tPhotoUris)
+        case None => ("", "", "", "[]", "[]", "[]", "[]")
       }
     }
 
@@ -46,11 +46,11 @@ class Details(ecp: ExecutionContext, repo: PlaceRepo) {
 
   def getDetailsJson(pid: String, placeKeywords: String): Future[String] = {
     for {
-      (url1, dbSum, dbSumMod, rComments, tComments) <- getDBInfo(pid)
+      (url1, dbSum, dbSumMod, rComments, tComments, rPhotoUris, tPhotoUris) <- getDBInfo(pid)
       url2 <- if(url1 == "") getGoogWebsite(pid) else Future {url1}
-      (sum, _) <- calcUrlSumAndScore(placeKeywords, url2)
-
+      (sum, _) <- if(dbSum.isEmpty || (dbSum.nonEmpty && sumModDateExp(dbSumMod))) calcUrlSumAndScore(placeKeywords, url2) else Future{(dbSum, 0)}
       i <- if(sumModDateExp(dbSumMod)) setNewSum(sum, pid) else Future {0}
-    } yield "{ " + "\"summary\" : \"" + sum.replace("\"", "\\\"") + "\", \"rComments\" : " + rComments + ", \"tComments\" : " + tComments + " }"
+    } yield "{ " + "\"summary\" : \"" + sum.replace("\"", "\\\"") + "\", \"rComments\" : " + rComments + ", \"tComments\" : " + tComments +
+      ", \"rPhotoUris\" : " + rPhotoUris + ", \"tPhotoUris\" : " + tPhotoUris + " }"
   }
 }

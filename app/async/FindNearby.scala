@@ -50,7 +50,7 @@ class FindNearby(ecp: ExecutionContext, repo: PlaceRepo) {
           case _ => ""
         }
         val viewportRef: String = (e \ "geometry" \ "viewport" \ "northeast" \ "lat", e \ "geometry" \ "viewport" \ "northeast" \ "lng",
-                                   e \ "geometry" \ "viewport" \ "southwest" \ "lat", e \ "geometry" \ "viewport" \ "southwest" \ "lng") match {
+          e \ "geometry" \ "viewport" \ "southwest" \ "lat", e \ "geometry" \ "viewport" \ "southwest" \ "lng") match {
           case (JsDefined(JsNumber(l1)), JsDefined(JsNumber(l2)), JsDefined(JsNumber(l3)), JsDefined(JsNumber(l4))) =>
             l1.toString + ", " + l2.toString + ", " + l3.toString + ", " + l4.toString
           case _ => ""
@@ -80,7 +80,7 @@ class FindNearby(ecp: ExecutionContext, repo: PlaceRepo) {
 
   def procPhotoUris(l: List[NearbyElem], p: List[Place]): List[NearbyElem] = {
     def changeUri(e: NearbyElem, p: Place): NearbyElem = {
-      (e._1, e._2, e._3, e._4, e._5, p.photo_uri, e._7)
+      (e._1, e._2, e._3, e._4, e._5, p.topPhotoUri, e._7)
     }
 
     def helper(acc: List[NearbyElem], l: List[NearbyElem], p: List[Place]): List[NearbyElem] = {

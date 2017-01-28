@@ -1,9 +1,9 @@
-@(nForm: Form[CreateNearbyForm])(detForm: Form[GetDetailsForm])(urlForm: Form[ChangeURLForm])(photoForm: Form[ChangePhotoForm])(postCommentForm: Form[PostCommentForm])(upvoteCommentForm: Form[UpvoteCommentForm])(downvoteCommentForm: Form[DownvoteCommentForm])(implicit messages: Messages)
+@(nForm: Form[CreateNearbyForm])(detForm: Form[GetDetailsForm])(urlForm: Form[ChangeURLForm])(photoForm: Form[AddPhotoForm])(postCommentForm: Form[PostCommentForm])(upvoteCommentForm: Form[UpvoteCommentForm])(downvoteCommentForm: Form[DownvoteCommentForm])(implicit messages: Messages)
 
 @import helper._
 
 @main("SceneKap") {
-	<ul id="persons"></ul>
+    <ul id="persons"></ul>
 
     <div align="center">
         <div class="title">
@@ -16,7 +16,7 @@
     <div class="container">
         <div class="row">
             <div align="center">
-                <div class="three columns">
+                <div class="four columns">
                     @form(routes.PlaceController.nearbyBtn()) {
                         @inputText(nForm("Lat"))
                         @inputText(nForm("Long"))
@@ -28,7 +28,7 @@
                     <br>
                 </div>
 
-                <div class="three columns">
+                <div class="four columns">
                     @form(routes.PlaceController.detailsBtn()) {
                         @inputText(detForm("ID"))
                         @inputText(detForm("Keywords"))
@@ -40,7 +40,7 @@
                     <br>
                 </div>
 
-                <div class="three columns">
+                <div class="four columns">
                     @form(routes.PlaceController.urlBtn()) {
                         @inputText(urlForm("ID"))
                         @inputText(urlForm("Keywords"))
@@ -48,18 +48,6 @@
 
                         <div class="buttons">
                             <input type="submit" value="Change Website"/>
-                        </div>
-                    }
-                    <br>
-                </div>
-
-                <div class="three columns">
-                    @form(routes.PlaceController.photoBtn()) {
-                        @inputText(photoForm("ID"))
-                        @inputText(photoForm("URL"))
-
-                        <div class="buttons">
-                            <input type="submit" value="Change Photo"/>
                         </div>
                     }
                     <br>
@@ -87,7 +75,7 @@
                         @inputText(upvoteCommentForm("CID"))
 
                         <div class="buttons">
-                            <input type="submit" value="Upvote"/>
+                            <input type="submit" value="Upvote Comment"/>
                         </div>
                     }
                     <br>
@@ -99,7 +87,47 @@
                         @inputText(downvoteCommentForm("CID"))
 
                         <div class="buttons">
-                            <input type="submit" value="Downvote"/>
+                            <input type="submit" value="Downvote Comment"/>
+                        </div>
+                    }
+                    <br>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div align="center">
+                <div class="four columns">
+                    @form(routes.PlaceController.addPhotoBtn()) {
+                        @inputText(postCommentForm("ID"))
+                        @inputText(postCommentForm("URL"))
+
+                        <div class="buttons">
+                            <input type="submit" value="Add Photo"/>
+                        </div>
+                    }
+                    <br>
+                </div>
+
+                <div class="four columns">
+                    @form(routes.PlaceController.upvotePhotoBtn()) {
+                        @inputText(upvoteCommentForm("ID"))
+                        @inputText(upvoteCommentForm("CID"))
+
+                        <div class="buttons">
+                            <input type="submit" value="Upvote Photo"/>
+                        </div>
+                    }
+                    <br>
+                </div>
+
+                <div class="four columns">
+                    @form(routes.PlaceController.downvotePhotoBtn()) {
+                        @inputText(downvoteCommentForm("ID"))
+                        @inputText(downvoteCommentForm("CID"))
+
+                        <div class="buttons">
+                            <input type="submit" value="Downvote Photo"/>
                         </div>
                     }
                     <br>
