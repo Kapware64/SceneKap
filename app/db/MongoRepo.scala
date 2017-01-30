@@ -171,13 +171,6 @@ class MongoRepo @Inject()(implicit ec: ExecutionContext) {
     }
   }
 
-  private def getUsers(scoreCutoff: Int): Future[List[User]] = {
-    for {
-      res <- usersCollection.find(gte("score", scoreCutoff)).toFuture
-      place <- Future{convDocToUsers(res)}
-    } yield place
-  }
-
   private def getCurDateSeconds: String = (System.currentTimeMillis / 1000).toString
 
   private def getDay: String = {
@@ -308,10 +301,10 @@ class MongoRepo @Inject()(implicit ec: ExecutionContext) {
     for {
       rRes <- placesCollection.findOneAndUpdate(and(equal("pid", pid), equal("rComments.id", cid)), combine(inc("rComments.$.votes", voteVal), set("tCommentsSorted", false)), elemFilter).toFuture
       delRes <- if(voteVal < 0) placesCollection.updateOne(and(equal("pid", pid), equal("rComments.id", cid)), pull("rComments", lte("votes", COMMENT_DELETE_CUTOFF))).toFuture else Future{rRes}
-      scoreRes1 <- changeScore(username, voteVal * VOTE_SCORE_MULT)
+      scoreRes1 <- changeScore(username, VOTE_SCORE_MULT)
       scoreRes2 <- {
         val user = extractUserFromDoc(rRes.head)
-        val cScoreVal = if(user == username) voteVal * -1 else voteVal
+        val cScoreVal = if(user == username) -1 else voteVal
         if(voteVal > 0 && user.nonEmpty) changeScore(user, cScoreVal * VOTE_SCORE_MULT) else Future{0}
       }
       finalRes <- if(rRes.isEmpty) Future{0} else Future{1}
@@ -324,10 +317,10 @@ class MongoRepo @Inject()(implicit ec: ExecutionContext) {
     for {
       rRes <- placesCollection.findOneAndUpdate(and(equal("pid", pid), equal("rPhotoUris.id", cid)), combine(inc("rPhotoUris.$.votes", voteVal), set("tPhotosSorted", false)), elemFilter).toFuture
       delRes <- if(voteVal < 0) placesCollection.updateOne(and(equal("pid", pid), equal("rPhotoUris.id", cid)), pull("rPhotoUris", lte("votes", PHOTO_DELETE_CUTOFF))).toFuture else Future{rRes}
-      scoreRes1 <- changeScore(username, voteVal * VOTE_SCORE_MULT)
+      scoreRes1 <- changeScore(username, VOTE_SCORE_MULT)
       scoreRes2 <- {
         val user = extractUserFromDoc(rRes.head)
-        val cScoreVal = if(user == username) voteVal * -1 else voteVal
+        val cScoreVal = if(user == username) -1 else voteVal
         if(voteVal > 0 && user.nonEmpty) changeScore(user, cScoreVal * VOTE_SCORE_MULT) else Future{0}
       }
       finalRes <- if(rRes.isEmpty) Future{0} else Future{1}
@@ -364,7 +357,10 @@ class MongoRepo @Inject()(implicit ec: ExecutionContext) {
     } yield finalRes
   }
 
-  def getAllUsers: Future[List[User]] = getUsers(0)
+  def getAllUsers: Future[List[User]] = {
+    for {
+      res <- usersCollection.find().toFuture
+      place <- Future{convDocToUsers(res)}
+    } yield place
+  }
 }
-
-case class CommentAddAction(needAdjust: Boolean, failed: Boolean)

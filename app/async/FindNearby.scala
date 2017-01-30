@@ -80,7 +80,7 @@ class FindNearby(ecp: ExecutionContext, repo: MongoRepo) {
 
   def procPhotoUris(l: List[NearbyElem], p: List[Place]): List[NearbyElem] = {
     def changeUri(e: NearbyElem, p: Place): NearbyElem = {
-      (e._1, e._2, e._3, e._4, e._5, p.topPhotoUri, e._7)
+      (e._1, e._2, e._3, e._4, e._5, if(p.topPhotoUri.nonEmpty) p.topPhotoUri else e._6, e._7)
     }
 
     def helper(acc: List[NearbyElem], l: List[NearbyElem], p: List[Place]): List[NearbyElem] = {

@@ -88,7 +88,7 @@
 
         <div class="row">
             <div align="center">
-                <div class="four columns">
+                <div class="six columns">
                     @form(routes.PlaceController.addPhotoBtn()) {
                         @inputText(postCommentForm("ID"))
                         @inputText(postCommentForm("URL"))
@@ -101,7 +101,7 @@
                     <br>
                 </div>
 
-                <div class="four columns">
+                <div class="six columns">
                     @form(routes.PlaceController.votePhotoBtn()) {
                         @inputText(voteCommentForm("ID"))
                         @inputText(voteCommentForm("CID"))
@@ -109,21 +109,7 @@
                         @inputText(voteCommentForm("Username"))
 
                         <div class="buttons">
-                            <input type="submit" value="Upvote Photo"/>
-                        </div>
-                    }
-                    <br>
-                </div>
-
-                <div class="four columns">
-                    @form(routes.PlaceController.votePhotoBtn()) {
-                        @inputText(voteCommentForm("ID"))
-                        @inputText(voteCommentForm("CID"))
-                        @inputText(voteCommentForm("VoteVal"))
-                        @inputText(voteCommentForm("Username"))
-
-                        <div class="buttons">
-                            <input type="submit" value="Downvote Photo"/>
+                            <input type="submit" value="Vote Photo"/>
                         </div>
                     }
                     <br>
