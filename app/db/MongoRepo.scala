@@ -42,7 +42,7 @@ class MongoRepo @Inject()(implicit ec: ExecutionContext) {
 
   val ADD_COMMENT_SCORE: Int = appConf.getInt("scoring.addComment")
   val ADD_PHOTO_SCORE: Int = appConf.getInt("scoring.addPhoto")
-  val VOTE_SCORE: Int = appConf.getInt("scoring.vote")
+  val VOTE_SCORE_MULT: Int = appConf.getInt("scoring.voteMult")
 
   val strConf: String = "mongodb://localhost/?connectTimeoutMS=" + MONGO_CONNECT_TIMEOUT + "&socketTimeoutMS=" + MONGO_SOCKET_TIMEOUT + "&serverSelectionTimeoutMS=" + MONGO_SERVER_SELECTION_TIMEOUT
   val mongoClient: MongoClient = MongoClient(strConf)
@@ -308,11 +308,11 @@ class MongoRepo @Inject()(implicit ec: ExecutionContext) {
     for {
       rRes <- placesCollection.findOneAndUpdate(and(equal("pid", pid), equal("rComments.id", cid)), combine(inc("rComments.$.votes", voteVal), set("tCommentsSorted", false)), elemFilter).toFuture
       delRes <- if(voteVal < 0) placesCollection.updateOne(and(equal("pid", pid), equal("rComments.id", cid)), pull("rComments", lte("votes", COMMENT_DELETE_CUTOFF))).toFuture else Future{rRes}
-      scoreRes1 <- changeScore(username, voteVal)
+      scoreRes1 <- changeScore(username, voteVal * VOTE_SCORE_MULT)
       scoreRes2 <- {
         val user = extractUserFromDoc(rRes.head)
         val cScoreVal = if(user == username) voteVal * -1 else voteVal
-        if(voteVal > 0 && user.nonEmpty) changeScore(user, cScoreVal) else Future{0}
+        if(voteVal > 0 && user.nonEmpty) changeScore(user, cScoreVal * VOTE_SCORE_MULT) else Future{0}
       }
       finalRes <- if(rRes.isEmpty) Future{0} else Future{1}
     } yield finalRes
@@ -324,11 +324,11 @@ class MongoRepo @Inject()(implicit ec: ExecutionContext) {
     for {
       rRes <- placesCollection.findOneAndUpdate(and(equal("pid", pid), equal("rPhotoUris.id", cid)), combine(inc("rPhotoUris.$.votes", voteVal), set("tPhotosSorted", false)), elemFilter).toFuture
       delRes <- if(voteVal < 0) placesCollection.updateOne(and(equal("pid", pid), equal("rPhotoUris.id", cid)), pull("rPhotoUris", lte("votes", PHOTO_DELETE_CUTOFF))).toFuture else Future{rRes}
-      scoreRes1 <- changeScore(username, voteVal)
+      scoreRes1 <- changeScore(username, voteVal * VOTE_SCORE_MULT)
       scoreRes2 <- {
         val user = extractUserFromDoc(rRes.head)
         val cScoreVal = if(user == username) voteVal * -1 else voteVal
-        if(voteVal > 0 && user.nonEmpty) changeScore(user, cScoreVal) else Future{0}
+        if(voteVal > 0 && user.nonEmpty) changeScore(user, cScoreVal * VOTE_SCORE_MULT) else Future{0}
       }
       finalRes <- if(rRes.isEmpty) Future{0} else Future{1}
     } yield finalRes
