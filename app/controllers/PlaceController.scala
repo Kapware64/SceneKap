@@ -9,19 +9,28 @@ import scala.concurrent.ExecutionContext
 import javax.inject._
 
 import async._
-import db.PlaceRepo
-import models.Place
-import play.api.libs.json.{Json, Writes}
+import com.typesafe.config.ConfigFactory
+import db.MongoRepo
+import models.{Place, User}
+import play.api.libs.json.{JsValue, Json, Writes}
 
 /**
   * Created by NoahKaplan on 10/25/16.
   */
-class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
+class PlaceController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
                                 (implicit ec: ExecutionContext) extends Controller with I18nSupport {
+  val appConf = ConfigFactory.load
+
   val findNearby = new FindNearby(ec, repo)
   val getDetails = new Details(ec, repo)
 
-  implicit val nearbyElemDetWrites = new Writes[Place] {
+  val BRONZE_CUTOFF: Int = appConf.getInt("scoring.bronzeCutoff")
+  val SILVER_CUTOFF: Int = appConf.getInt("scoring.silverCutoff")
+  val GOLD_CUTOFF: Int = appConf.getInt("scoring.goldCutoff")
+
+  case class Cutoffs(bronze: Int, silver: Int, gold: Int)
+
+  implicit val placeWrites = new Writes[Place] {
     def writes(p: Place) = Json.obj(
       "pid" -> p.pid,
       "rComments" -> Json.parse(p.rComments),
@@ -35,8 +44,28 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     )
   }
 
+  implicit val userWrites = new Writes[User] {
+    def writes(u: User) = Json.obj(
+      "username" -> u.username,
+      "password" -> u.password,
+      "email" -> u.email,
+      "deviceID" -> u.deviceID,
+      "score" -> u.score
+    )
+  }
+
+  implicit val cutoffsWrites = new Writes[Cutoffs] {
+    def writes(c: Cutoffs) = Json.obj(
+      "bronze" -> c.bronze,
+      "silver" -> c.silver,
+      "gold" -> c.gold
+    )
+  }
+
+  private def getRankCutoffs: JsValue = Json.toJson(Cutoffs(BRONZE_CUTOFF, SILVER_CUTOFF, GOLD_CUTOFF))
+
   def index = Action {
-    Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
+    Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm))
   }
 
   def nearby(lat: String, long: String) = Action.async {
@@ -63,49 +92,73 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     }
   }
 
-  def addPhoto(pid: String, url: String) = Action.async {
-    repo.addPhoto(pid, url).map { res =>
+  def addPhoto(pid: String, url: String, username: String) = Action.async {
+    repo.addPhoto(pid, url, username).map { res =>
       Ok(res.toString)
     } recover {
       case _ => ServiceUnavailable("Database query failed")
     }
   }
 
-  def upvotePhoto(pid: String, cid: String) = Action.async {
-    repo.upvotePhoto(pid, cid).map { res =>
+  def votePhoto(pid: String, cid: String, voteVal: String, username: String) = Action.async {
+    repo.votePhoto(pid, cid, voteVal.toInt, username).map { res =>
       Ok(res.toString)
     } recover {
       case _ => ServiceUnavailable("Database query failed")
     }
   }
 
-  def downvotePhoto(pid: String, cid: String) = Action.async {
-    repo.downvotePhoto(pid, cid).map { res =>
+  def addComment(pid: String, text: String, username: String) = Action.async {
+    repo.addComment(pid, text, username).map { res =>
       Ok(res.toString)
     } recover {
       case _ => ServiceUnavailable("Database query failed")
     }
   }
 
-  def addComment(pid: String, text: String) = Action.async {
-    repo.addComment(pid, text).map { res =>
+  def voteComment(pid: String, cid: String, voteVal: String, username: String) = Action.async {
+    repo.voteComment(pid, cid, voteVal.toInt, username).map { res =>
       Ok(res.toString)
     } recover {
       case _ => ServiceUnavailable("Database query failed")
     }
   }
 
-  def upvoteComment(pid: String, cid: String) = Action.async {
-    repo.upvoteComment(pid, cid).map { res =>
+  def addUser(username: String, password: String, email: String, deviceID: String) = Action.async {
+    repo.addUser(username, password, email, deviceID).map { res =>
       Ok(res.toString)
     } recover {
-      case _ => ServiceUnavailable("Database query failed")
+      case _ =>  ServiceUnavailable("Database query failed")
     }
   }
 
-  def downvoteComment(pid: String, cid: String) = Action.async {
-    repo.downvoteComment(pid, cid).map { res =>
+  def firstLogin(username: String, password: String, deviceID: String) = Action.async {
+    repo.firstLogin(username, password, deviceID).map { res =>
       Ok(res.toString)
+    } recover {
+      case _ =>  ServiceUnavailable("Database query failed")
+    }
+  }
+
+  def regLogin(username: String, password: String, deviceID: String) = Action.async {
+    repo.regLogin(username, password, deviceID).map { res =>
+      Ok(res.toString)
+    } recover {
+      case _ =>  ServiceUnavailable("Database query failed")
+    }
+  }
+
+  def changeScore(username: String, voteVal: String) = Action.async {
+    repo.changeScore(username, voteVal.toInt).map { res =>
+      Ok(res.toString)
+    } recover {
+      case _ =>  ServiceUnavailable("Database query failed")
+    }
+  }
+
+  def getAllUsers = Action.async { implicit request =>
+    repo.getAllUsers.map { data =>
+      Ok(Json.toJson(data))
     } recover {
       case _ => ServiceUnavailable("Database query failed")
     }
@@ -117,6 +170,10 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     } recover {
       case _ => ServiceUnavailable("Database query failed")
     }
+  }
+
+  def getCutoffs = Action {
+    Ok(getRankCutoffs)
   }
 
   val llForm: Form[CreateNearbyForm] = Form {
@@ -144,49 +201,65 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
   val addPhotoForm: Form[AddPhotoForm] = Form {
     mapping(
       "ID" -> nonEmptyText,
-      "URL" -> nonEmptyText
+      "URL" -> nonEmptyText,
+      "Username" -> nonEmptyText
     )(AddPhotoForm.apply)(AddPhotoForm.unapply)
   }
 
-  val upvotePhotoForm: Form[UpvotePhotoForm] = Form {
+  val votePhotoForm: Form[VotePhotoForm] = Form {
     mapping(
       "ID" -> nonEmptyText,
-      "CID" -> nonEmptyText
-    )(UpvotePhotoForm.apply)(UpvotePhotoForm.unapply)
-  }
-
-  val downvotePhotoForm: Form[DownvotePhotoForm] = Form {
-    mapping(
-      "ID" -> nonEmptyText,
-      "CID" -> nonEmptyText
-    )(DownvotePhotoForm.apply)(DownvotePhotoForm.unapply)
+      "CID" -> nonEmptyText,
+      "VoteVal" -> bigDecimal,
+      "Username" -> nonEmptyText
+    )(VotePhotoForm.apply)(VotePhotoForm.unapply)
   }
 
   val postCommentForm: Form[PostCommentForm] = Form {
     mapping(
       "ID" -> nonEmptyText,
-      "Text" -> nonEmptyText
+      "Text" -> nonEmptyText,
+      "Username" -> nonEmptyText
     )(PostCommentForm.apply)(PostCommentForm.unapply)
   }
 
-  val upvoteCommentForm: Form[UpvoteCommentForm] = Form {
+  val voteCommentForm: Form[VoteCommentForm] = Form {
     mapping(
       "ID" -> nonEmptyText,
-      "CID" -> nonEmptyText
-    )(UpvoteCommentForm.apply)(UpvoteCommentForm.unapply)
+      "CID" -> nonEmptyText,
+      "VoteVal" -> bigDecimal,
+      "Username" -> nonEmptyText
+    )(VoteCommentForm.apply)(VoteCommentForm.unapply)
   }
 
-  val downvoteCommentForm: Form[DownvoteCommentForm] = Form {
+  val addUserForm: Form[AddUserForm] = Form {
     mapping(
-      "ID" -> nonEmptyText,
-      "CID" -> nonEmptyText
-    )(DownvoteCommentForm.apply)(DownvoteCommentForm.unapply)
+      "Username" -> nonEmptyText,
+      "Password" -> nonEmptyText,
+      "Email" -> nonEmptyText,
+      "DeviceID" -> nonEmptyText
+    )(AddUserForm.apply)(AddUserForm.unapply)
+  }
+
+  val loginForm: Form[LoginForm] = Form {
+    mapping(
+      "Username" -> nonEmptyText,
+      "Password" -> nonEmptyText,
+      "DeviceID" -> nonEmptyText
+    )(LoginForm.apply)(LoginForm.unapply)
+  }
+
+  val changeScoreForm: Form[ChangeScoreForm] = Form {
+    mapping(
+      "Username" -> nonEmptyText,
+      "VoteVal" -> bigDecimal
+    )(ChangeScoreForm.apply)(ChangeScoreForm.unapply)
   }
 
   def nearbyBtn = Action { implicit request =>
     llForm.bindFromRequest.fold(
       errorForm => {
-        Ok(views.html.index(errorForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
+        Ok(views.html.index(errorForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm))
       },
       coord => {
         Redirect("/nearby/" + coord.lat + "/" + coord.long)
@@ -197,7 +270,7 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
   def detailsBtn = Action { implicit request =>
     detForm.bindFromRequest.fold(
       errorForm => {
-        Ok(views.html.index(llForm)(errorForm)(changeURLForm)(addPhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
+        Ok(views.html.index(llForm)(errorForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm))
       },
       p => {
         Redirect("/details/" + p.pid + "/" + p.placeKeywords)
@@ -209,7 +282,7 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     changeURLForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(errorForm)(addPhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
+          Ok(views.html.index(llForm)(detForm)(errorForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
@@ -228,13 +301,13 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     addPhotoForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(changeURLForm)(errorForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(errorForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
       },
       p => {
-        repo.addPhoto(p.pid, p.url).map { res =>
+        repo.addPhoto(p.pid, p.url, p.username).map { res =>
           Ok(res.toString)
         } recover {
           case _ => ServiceUnavailable("Database query failed")
@@ -247,13 +320,13 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     postCommentForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(errorForm)(upvoteCommentForm)(downvoteCommentForm))
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(errorForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
       },
       p => {
-        repo.addComment(p.pid, p.text).map { res =>
+        repo.addComment(p.pid, p.text, p.username).map { res =>
           Ok(res.toString)
         } recover {
           case _ => ServiceUnavailable("Database query failed")
@@ -262,17 +335,17 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     )
   }
 
-  def upvoteCommentBtn = Action.async { implicit request =>
-    upvoteCommentForm.bindFromRequest.fold(
+  def voteCommentBtn = Action.async { implicit request =>
+    voteCommentForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(errorForm)(downvoteCommentForm))
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(errorForm)(addUserForm)(loginForm)(changeScoreForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
       },
       p => {
-        repo.upvoteComment(p.pid, p.cid).map { res =>
+        repo.voteComment(p.pid, p.cid, p.voteVal.toInt, p.username).map { res =>
           Ok(res.toString)
         } recover {
           case _ => ServiceUnavailable("Database query failed")
@@ -281,17 +354,17 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     )
   }
 
-  def downvoteCommentBtn = Action.async { implicit request =>
-    downvoteCommentForm.bindFromRequest.fold(
+  def votePhotoBtn = Action.async { implicit request =>
+    votePhotoForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(upvoteCommentForm)(errorForm))
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
       },
       p => {
-        repo.downvoteComment(p.pid, p.cid).map { res =>
+        repo.votePhoto(p.pid, p.cid, p.voteVal.toInt, p.username).map { res =>
           Ok(res.toString)
         } recover {
           case _ => ServiceUnavailable("Database query failed")
@@ -300,17 +373,17 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     )
   }
 
-  def upvotePhotoBtn = Action.async { implicit request =>
-    upvotePhotoForm.bindFromRequest.fold(
+  def addUserBtn = Action.async { implicit request =>
+    addUserForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(errorForm)(loginForm)(changeScoreForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
       },
       p => {
-        repo.upvotePhoto(p.pid, p.cid).map { res =>
+        repo.addUser(p.username, p.password, p.email, p.deviceID).map { res =>
           Ok(res.toString)
         } recover {
           case _ => ServiceUnavailable("Database query failed")
@@ -319,17 +392,55 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
     )
   }
 
-  def downvotePhotoBtn = Action.async { implicit request =>
-    downvotePhotoForm.bindFromRequest.fold(
+  def firstLoginBtn = Action.async { implicit request =>
+    loginForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(upvoteCommentForm)(downvoteCommentForm))
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(errorForm)(changeScoreForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
       },
       p => {
-        repo.downvotePhoto(p.pid, p.cid).map { res =>
+        repo.firstLogin(p.username, p.password, p.deviceID).map { res =>
+          Ok(res.toString)
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
+        }
+      }
+    )
+  }
+
+  def regLoginBtn = Action.async { implicit request =>
+    loginForm.bindFromRequest.fold(
+      errorForm => {
+        repo.list().map { _ =>
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(errorForm)(changeScoreForm))
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
+        }
+      },
+      p => {
+        repo.regLogin(p.username, p.password, p.deviceID).map { res =>
+          Ok(res.toString)
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
+        }
+      }
+    )
+  }
+
+  def changeScoreBtn = Action.async { implicit request =>
+    changeScoreForm.bindFromRequest.fold(
+      errorForm => {
+        repo.list().map { _ =>
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(errorForm))
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
+        }
+      },
+      p => {
+        repo.changeScore(p.username, p.voteVal.toInt).map { res =>
           Ok(res.toString)
         } recover {
           case _ => ServiceUnavailable("Database query failed")
@@ -342,9 +453,11 @@ class PlaceController @Inject() (repo: PlaceRepo, val messagesApi: MessagesApi)
 case class CreateNearbyForm(lat: BigDecimal, long: BigDecimal)
 case class GetDetailsForm(pid: String, placeKeywords: String)
 case class ChangeURLForm(pid: String, placeKeywords: String, url: String)
-case class AddPhotoForm(pid: String, url: String)
-case class UpvotePhotoForm(pid: String, cid: String)
-case class DownvotePhotoForm(pid: String, cid: String)
-case class PostCommentForm(pid: String, text: String)
-case class UpvoteCommentForm(pid: String, cid: String)
-case class DownvoteCommentForm(pid: String, cid: String)
+case class AddPhotoForm(pid: String, url: String, username: String)
+case class VotePhotoForm(pid: String, cid: String, voteVal: BigDecimal, username: String)
+case class PostCommentForm(pid: String, text: String, username: String)
+case class VoteCommentForm(pid: String, cid: String, voteVal: BigDecimal, username: String)
+
+case class AddUserForm(username: String, password: String, email: String, deviceID: String)
+case class LoginForm(username: String, password: String, deviceID: String)
+case class ChangeScoreForm(username: String, voteVal: BigDecimal)

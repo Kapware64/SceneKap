@@ -3,18 +3,22 @@
 # ~~~~
 
 # Home page
-GET     /                                            controllers.PlaceController.index
-GET     /getall                                      controllers.PlaceController.getAll
-GET     /nearby/:lat/:long                           controllers.PlaceController.nearby(lat, long)
-GET     /details/:pid/:name                          controllers.PlaceController.details(pid, name)
+GET     /                                                   controllers.PlaceController.index
+GET     /getAll                                             controllers.PlaceController.getAll
+GET     /getAllUsers                                        controllers.PlaceController.getAllUsers
+GET     /nearby/:lat/:long                                  controllers.PlaceController.nearby(lat, long)
+GET     /details/:pid/:name                                 controllers.PlaceController.details(pid, name)
+GET     /firstLogin/:username/:password/:deviceID           controllers.PlaceController.firstLogin(username, password, deviceID)
+GET     /regLogin/:username/:password/:deviceID             controllers.PlaceController.regLogin(username, password, deviceID)
+GET     /getCutoffs                                         controllers.PlaceController.getCutoffs
 
-POST    /website/:pid/:placeKeywords/:url            controllers.PlaceController.changeWebsite(pid, placeKeywords, url)
-POST    /addPhoto/:pid/:url                          controllers.PlaceController.addPhoto(pid, url)
-POST    /upvotePhoto/:pid/:cid                       controllers.PlaceController.upvotePhoto(pid, cid)
-POST    /downvotePhoto/:pid/:cid                     controllers.PlaceController.downvotePhoto(pid, cid)
-POST    /addComment/:pid/:text                       controllers.PlaceController.addComment(pid, text)
-POST    /upvoteComment/:pid/:cid                     controllers.PlaceController.upvoteComment(pid, cid)
-POST    /downvoteComment/:pid/:cid                   controllers.PlaceController.downvoteComment(pid, cid)
+POST    /website/:pid/:placeKeywords/:url                   controllers.PlaceController.changeWebsite(pid, placeKeywords, url)
+POST    /addPhoto/:pid/:url/:username                       controllers.PlaceController.addPhoto(pid, url, username)
+POST    /votePhoto/:pid/:cid/:voteVal/:username             controllers.PlaceController.votePhoto(pid, cid, voteVal, username)
+POST    /addComment/:pid/:text/:username                    controllers.PlaceController.addComment(pid, text, username)
+POST    /voteComment/:pid/:cid/:voteVal/:username           controllers.PlaceController.voteComment(pid, cid, voteVal, username)
+POST    /addUser/:username/:password/:email/:deviceID       controllers.PlaceController.addUser(username, password, email, deviceID)
+POST    /changeScore/:username/:voteVal                     controllers.PlaceController.changeScore(username, voteVal)
 
 #change into getDetails, which also returns comments
 #post for a pid's comments (new comment and upvote/downvote)
@@ -27,10 +31,12 @@ POST    /details                    controllers.PlaceController.detailsBtn
 POST    /changeUrl                  controllers.PlaceController.urlBtn
 POST    /changePhoto                controllers.PlaceController.addPhotoBtn
 POST    /addComment                 controllers.PlaceController.addCommentBtn
-POST    /upvoteComment              controllers.PlaceController.upvoteCommentBtn
-POST    /downvoteComment            controllers.PlaceController.downvoteCommentBtn
-POST    /upvotePhoto                controllers.PlaceController.upvotePhotoBtn
-POST    /downvotePhoto              controllers.PlaceController.downvotePhotoBtn
+POST    /voteComment                controllers.PlaceController.voteCommentBtn
+POST    /votePhoto                  controllers.PlaceController.votePhotoBtn
+POST    /addUserBtn                 controllers.PlaceController.addUserBtn
+POST    /firstLoginBtn              controllers.PlaceController.firstLoginBtn
+POST    /regLoginBtn                controllers.PlaceController.regLoginBtn
+POST    /changeScoreBtn             controllers.PlaceController.changeScoreBtn
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)

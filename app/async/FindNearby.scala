@@ -1,6 +1,6 @@
 package async
 
-import db.PlaceRepo
+import db.MongoRepo
 import models.Place
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -9,7 +9,7 @@ import play.api.libs.json._
 /**
   * Created by NoahKaplan on 10/25/16.
   */
-class FindNearby(ecp: ExecutionContext, repo: PlaceRepo) {
+class FindNearby(ecp: ExecutionContext, repo: MongoRepo) {
   implicit val ec = ecp
 
   type NearbyElem = (String, String, String, String, String, String, String)

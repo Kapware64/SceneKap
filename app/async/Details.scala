@@ -2,14 +2,13 @@ package async
 
 import scala.concurrent.{ExecutionContext, Future}
 import play.api.libs.json._
-
-import db.PlaceRepo
+import db.MongoRepo
 import models.Place
 
 /**
   * Created by NoahKaplan on 10/25/16.
   */
-class Details(ecp: ExecutionContext, repo: PlaceRepo) {
+class Details(ecp: ExecutionContext, repo: MongoRepo) {
   implicit val ec = ecp
 
   private def getDBInfo(pid: String): Future[(String, String, String, String, String, String, String)] = {

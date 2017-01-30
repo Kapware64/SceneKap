@@ -1,4 +1,4 @@
-@(nForm: Form[CreateNearbyForm])(detForm: Form[GetDetailsForm])(urlForm: Form[ChangeURLForm])(photoForm: Form[AddPhotoForm])(postCommentForm: Form[PostCommentForm])(upvoteCommentForm: Form[UpvoteCommentForm])(downvoteCommentForm: Form[DownvoteCommentForm])(implicit messages: Messages)
+@(nForm: Form[CreateNearbyForm])(detForm: Form[GetDetailsForm])(urlForm: Form[ChangeURLForm])(photoForm: Form[AddPhotoForm])(postCommentForm: Form[PostCommentForm])(voteCommentForm: Form[VoteCommentForm])(addUserForm: Form[AddUserForm])(loginForm: Form[LoginForm])(changeScoreForm: Form[ChangeScoreForm])(implicit messages: Messages)
 
 @import helper._
 
@@ -61,6 +61,7 @@
                     @form(routes.PlaceController.addCommentBtn()) {
                         @inputText(postCommentForm("ID"))
                         @inputText(postCommentForm("Text"))
+                        @inputText(postCommentForm("Username"))
 
                         <div class="buttons">
                             <input type="submit" value="Add Comment"/>
@@ -70,9 +71,11 @@
                 </div>
 
                 <div class="four columns">
-                    @form(routes.PlaceController.upvoteCommentBtn()) {
-                        @inputText(upvoteCommentForm("ID"))
-                        @inputText(upvoteCommentForm("CID"))
+                    @form(routes.PlaceController.voteCommentBtn()) {
+                        @inputText(voteCommentForm("ID"))
+                        @inputText(voteCommentForm("CID"))
+                        @inputText(voteCommentForm("VoteVal"))
+                        @inputText(voteCommentForm("Username"))
 
                         <div class="buttons">
                             <input type="submit" value="Upvote Comment"/>
@@ -82,9 +85,11 @@
                 </div>
 
                 <div class="four columns">
-                    @form(routes.PlaceController.downvoteCommentBtn()) {
-                        @inputText(downvoteCommentForm("ID"))
-                        @inputText(downvoteCommentForm("CID"))
+                    @form(routes.PlaceController.voteCommentBtn()) {
+                        @inputText(voteCommentForm("ID"))
+                        @inputText(voteCommentForm("CID"))
+                        @inputText(voteCommentForm("VoteVal"))
+                        @inputText(voteCommentForm("Username"))
 
                         <div class="buttons">
                             <input type="submit" value="Downvote Comment"/>
@@ -101,6 +106,7 @@
                     @form(routes.PlaceController.addPhotoBtn()) {
                         @inputText(postCommentForm("ID"))
                         @inputText(postCommentForm("URL"))
+                        @inputText(postCommentForm("Username"))
 
                         <div class="buttons">
                             <input type="submit" value="Add Photo"/>
@@ -110,9 +116,11 @@
                 </div>
 
                 <div class="four columns">
-                    @form(routes.PlaceController.upvotePhotoBtn()) {
-                        @inputText(upvoteCommentForm("ID"))
-                        @inputText(upvoteCommentForm("CID"))
+                    @form(routes.PlaceController.votePhotoBtn()) {
+                        @inputText(voteCommentForm("ID"))
+                        @inputText(voteCommentForm("CID"))
+                        @inputText(voteCommentForm("VoteVal"))
+                        @inputText(voteCommentForm("Username"))
 
                         <div class="buttons">
                             <input type="submit" value="Upvote Photo"/>
@@ -122,9 +130,11 @@
                 </div>
 
                 <div class="four columns">
-                    @form(routes.PlaceController.downvotePhotoBtn()) {
-                        @inputText(downvoteCommentForm("ID"))
-                        @inputText(downvoteCommentForm("CID"))
+                    @form(routes.PlaceController.votePhotoBtn()) {
+                        @inputText(voteCommentForm("ID"))
+                        @inputText(voteCommentForm("CID"))
+                        @inputText(voteCommentForm("VoteVal"))
+                        @inputText(voteCommentForm("Username"))
 
                         <div class="buttons">
                             <input type="submit" value="Downvote Photo"/>
@@ -134,14 +144,79 @@
                 </div>
             </div>
         </div>
+
+        <div class="row">
+            <div align="center">
+                <div class="three columns">
+                    @form(routes.PlaceController.addUserBtn()) {
+                        @inputText(addUserForm("Username"))
+                        @inputText(addUserForm("Password"))
+                        @inputText(addUserForm("Email"))
+                        @inputText(addUserForm("DeviceID"))
+
+                        <div class="buttons">
+                            <input type="submit" value="Add User"/>
+                        </div>
+                    }
+                    <br>
+                </div>
+
+                <div class="three columns">
+                    @form(routes.PlaceController.firstLoginBtn()) {
+                        @inputText(loginForm("Username"))
+                        @inputText(loginForm("Password"))
+                        @inputText(loginForm("DeviceID"))
+
+                        <div class="buttons">
+                            <input type="submit" value="First Login"/>
+                        </div>
+                    }
+                    <br>
+                </div>
+
+                <div class="three columns">
+                    @form(routes.PlaceController.regLoginBtn()) {
+                        @inputText(loginForm("Username"))
+                        @inputText(loginForm("Password"))
+                        @inputText(loginForm("DeviceID"))
+
+                        <div class="buttons">
+                            <input type="submit" value="Regular Login"/>
+                        </div>
+                    }
+                    <br>
+                </div>
+
+                <div class="three columns">
+                    @form(routes.PlaceController.changeScoreBtn()) {
+                        @inputText(changeScoreForm("Username"))
+                        @inputText(changeScoreForm("VoteVal"))
+
+                        <div class="buttons">
+                            <input type="submit" value="Change Score"/>
+                        </div>
+                    }
+                    <br>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div align="center">
-        <br>
-        <br>
-        @form(routes.PlaceController.getAll()) {
+        @form(routes.PlaceController.getCutoffs) {
             <div class="buttons">
-                <input type="submit" value="View Data"/>
+                <input type="submit" value="View Cutoffs"/>
+            </div>
+        }
+        <br>
+        @form(routes.PlaceController.getAllUsers) {
+            <div class="buttons">
+                <input type="submit" value="View Users"/>
+            </div>
+        }
+        @form(routes.PlaceController.getAll) {
+            <div class="buttons">
+                <input type="submit" value="View Places"/>
             </div>
         }
     </div>
