@@ -19,6 +19,8 @@ POST    /addComment/:pid/:text/:username                    controllers.PlaceCon
 POST    /voteComment/:pid/:cid/:voteVal/:username           controllers.PlaceController.voteComment(pid, cid, voteVal, username)
 POST    /addUser/:username/:password/:email/:deviceID       controllers.UserController.addUser(username, password, email, deviceID)
 POST    /changeScore/:username/:voteVal                     controllers.UserController.changeScore(username, voteVal)
+POST    /changePassword/:username/:oldPass/:newPass         controllers.UserController.changePassword(username, oldPass, newPass)
+POST    /forgotPassword/:username/:email                    controllers.UserController.forgotPassword(username, email)
 
 #change into getDetails, which also returns comments
 #post for a pid's comments (new comment and upvote/downvote)
@@ -37,6 +39,8 @@ POST    /addUserBtn                 controllers.UserController.addUserBtn
 POST    /firstLoginBtn              controllers.UserController.firstLoginBtn
 POST    /regLoginBtn                controllers.UserController.regLoginBtn
 POST    /changeScoreBtn             controllers.UserController.changeScoreBtn
+POST    /changePasswordBtn          controllers.UserController.changePasswordBtn
+POST    /forgotPasswordBtn          controllers.UserController.forgotPasswordBtn
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)

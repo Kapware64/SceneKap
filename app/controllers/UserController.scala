@@ -84,6 +84,22 @@ class UserController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
     }
   }
 
+  def changePassword(username: String, oldPassword: String, newPassword: String) = Action.async { implicit request =>
+    repo.changePassword(username, oldPassword, newPassword).map { res =>
+      Ok(res.toString)
+    } recover {
+      case _ => ServiceUnavailable("Database query failed")
+    }
+  }
+
+  def forgotPassword(username: String, email: String) = Action.async { implicit request =>
+    repo.forgotPassword(username, email).map { res =>
+      Ok(res.toString)
+    } recover {
+      case _ => ServiceUnavailable("Database query failed")
+    }
+  }
+
   def getCutoffs = Action {
     Ok(getRankCutoffs)
   }
@@ -92,7 +108,7 @@ class UserController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
     addUserForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(errorForm)(loginForm)(changeScoreForm))
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(errorForm)(loginForm)(changeScoreForm)(changePasswordForm)(forgotPasswordForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
@@ -111,7 +127,7 @@ class UserController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
     loginForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(errorForm)(changeScoreForm))
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(errorForm)(changeScoreForm)(changePasswordForm)(forgotPasswordForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
@@ -130,7 +146,7 @@ class UserController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
     loginForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(errorForm)(changeScoreForm))
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(errorForm)(changeScoreForm)(changePasswordForm)(forgotPasswordForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
@@ -149,13 +165,51 @@ class UserController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
     changeScoreForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(errorForm))
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(errorForm)(changePasswordForm)(forgotPasswordForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
       },
       p => {
         repo.changeScore(p.username, p.voteVal.toInt).map { res =>
+          Ok(res.toString)
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
+        }
+      }
+    )
+  }
+
+  def changePasswordBtn = Action.async { implicit request =>
+    changePasswordForm.bindFromRequest.fold(
+      errorForm => {
+        repo.list().map { _ =>
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm)(errorForm)(forgotPasswordForm))
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
+        }
+      },
+      p => {
+        repo.changePassword(p.username, p.oldPassword, p.newPassword).map { res =>
+          Ok(res.toString)
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
+        }
+      }
+    )
+  }
+
+  def forgotPasswordBtn = Action.async { implicit request =>
+    forgotPasswordForm.bindFromRequest.fold(
+      errorForm => {
+        repo.list().map { _ =>
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm)(changePasswordForm)(errorForm))
+        } recover {
+          case _ => ServiceUnavailable("Database query failed")
+        }
+      },
+      p => {
+        repo.forgotPassword(p.username, p.email).map { res =>
           Ok(res.toString)
         } recover {
           case _ => ServiceUnavailable("Database query failed")

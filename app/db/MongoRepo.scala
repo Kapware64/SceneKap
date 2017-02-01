@@ -22,6 +22,8 @@ import async.calcUrlSumAndScore
 import async.detCommentProfanity
 import com.mongodb.client.result.UpdateResult
 
+import courier._
+
 @Singleton
 class MongoRepo @Inject()(implicit ec: ExecutionContext) {
   val appConf = ConfigFactory.load
@@ -43,6 +45,9 @@ class MongoRepo @Inject()(implicit ec: ExecutionContext) {
   val ADD_COMMENT_SCORE: Int = appConf.getInt("scoring.addComment")
   val ADD_PHOTO_SCORE: Int = appConf.getInt("scoring.addPhoto")
   val VOTE_SCORE_MULT: Int = appConf.getInt("scoring.voteMult")
+
+  val PASSWORD_EMAILER_ADDRESS: String = appConf.getString("password.emailerAddress")
+  val PASSWORD_EMAILER_PASSWORD: String = appConf.getString("password.emailerPassword")
 
   val strConf: String = "mongodb://localhost/?connectTimeoutMS=" + MONGO_CONNECT_TIMEOUT + "&socketTimeoutMS=" + MONGO_SOCKET_TIMEOUT + "&serverSelectionTimeoutMS=" + MONGO_SERVER_SELECTION_TIMEOUT
   val mongoClient: MongoClient = MongoClient(strConf)
@@ -362,5 +367,34 @@ class MongoRepo @Inject()(implicit ec: ExecutionContext) {
       res <- usersCollection.find().toFuture
       place <- Future{convDocToUsers(res)}
     } yield place
+  }
+
+  def changePassword(username: String, oldPassword: String, newPassword: String): Future[Int] = {
+    for {
+      res <- usersCollection.updateOne(and(equal("username", username), equal("password", oldPassword)), set("password", newPassword)).toFuture
+      finalRes <- if(res.head.wasAcknowledged) Future{1} else Future{0}
+    } yield finalRes
+  }
+
+  def forgotPassword(username: String, email: String): Future[Int] = {
+    for {
+      res <- usersCollection.find(and(equal("username", username), equal("email", email))).first.toFuture
+      finalRes <- if(res.isEmpty) Future{-1} else {
+        val mailer = Mailer("smtp.gmail.com", 587)
+          .auth(true)
+          .as(PASSWORD_EMAILER_ADDRESS, PASSWORD_EMAILER_PASSWORD)
+          .startTtls(true)()
+
+        val passwordRaw = res.head.getString("password")
+        val password = if(passwordRaw == null) "" else passwordRaw
+        val fut = mailer(Envelope.from(PASSWORD_EMAILER_ADDRESS.addr)
+          .to(email.addr)
+          .subject("SceneKap Forgotten Password")
+          .content(Text("Dear User, \n\nScroll down to see your login password for SceneKap.\n\nRegards,\nThe SceneKap Team" + "" +
+            "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n" + password + "\n\n\n\n")))
+
+        Future{1}
+      }
+    } yield finalRes
   }
 }

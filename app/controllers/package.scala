@@ -82,6 +82,21 @@ package object controllers {
     )(ChangeScoreForm.apply)(ChangeScoreForm.unapply)
   }
 
+  val changePasswordForm: Form[ChangePasswordForm] = Form {
+    mapping(
+      "Username" -> nonEmptyText,
+      "OldPassword" -> nonEmptyText,
+      "NewPassword" -> nonEmptyText
+    )(ChangePasswordForm.apply)(ChangePasswordForm.unapply)
+  }
+
+  val forgotPasswordForm: Form[ForgotPasswordForm] = Form {
+    mapping(
+      "Username" -> nonEmptyText,
+      "Email" -> nonEmptyText
+    )(ForgotPasswordForm.apply)(ForgotPasswordForm.unapply)
+  }
+
   case class CreateNearbyForm(lat: BigDecimal, long: BigDecimal)
   case class GetDetailsForm(pid: String, placeKeywords: String)
   case class ChangeURLForm(pid: String, placeKeywords: String, url: String)
@@ -93,4 +108,6 @@ package object controllers {
   case class AddUserForm(username: String, password: String, email: String, deviceID: String)
   case class LoginForm(username: String, password: String, deviceID: String)
   case class ChangeScoreForm(username: String, voteVal: BigDecimal)
+  case class ChangePasswordForm(username: String, oldPassword: String, newPassword: String)
+  case class ForgotPasswordForm(username: String, email: String)
 }

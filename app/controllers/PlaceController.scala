@@ -44,7 +44,7 @@ class PlaceController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
   }
 
   def index = Action {
-    Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm))
+    Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm)(changePasswordForm)(forgotPasswordForm))
   }
 
   def nearby(lat: String, long: String) = Action.async {
@@ -114,7 +114,7 @@ class PlaceController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
   def nearbyBtn = Action { implicit request =>
     llForm.bindFromRequest.fold(
       errorForm => {
-        Ok(views.html.index(errorForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm))
+        Ok(views.html.index(errorForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm)(changePasswordForm)(forgotPasswordForm))
       },
       coord => {
         Redirect("/nearby/" + coord.lat + "/" + coord.long)
@@ -125,7 +125,7 @@ class PlaceController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
   def detailsBtn = Action { implicit request =>
     detForm.bindFromRequest.fold(
       errorForm => {
-        Ok(views.html.index(llForm)(errorForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm))
+        Ok(views.html.index(llForm)(errorForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm)(changePasswordForm)(forgotPasswordForm))
       },
       p => {
         Redirect("/details/" + p.pid + "/" + p.placeKeywords)
@@ -137,7 +137,7 @@ class PlaceController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
     changeURLForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(errorForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm))
+          Ok(views.html.index(llForm)(detForm)(errorForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm)(changePasswordForm)(forgotPasswordForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
@@ -156,7 +156,7 @@ class PlaceController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
     addPhotoForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(changeURLForm)(errorForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm))
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(errorForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm)(changePasswordForm)(forgotPasswordForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
@@ -175,7 +175,7 @@ class PlaceController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
     postCommentForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(errorForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm))
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(errorForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm)(changePasswordForm)(forgotPasswordForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
@@ -194,7 +194,7 @@ class PlaceController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
     voteCommentForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(errorForm)(addUserForm)(loginForm)(changeScoreForm))
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(errorForm)(addUserForm)(loginForm)(changeScoreForm)(changePasswordForm)(forgotPasswordForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }
@@ -213,7 +213,7 @@ class PlaceController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
     votePhotoForm.bindFromRequest.fold(
       errorForm => {
         repo.list().map { _ =>
-          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm))
+          Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm)(changePasswordForm)(forgotPasswordForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
         }

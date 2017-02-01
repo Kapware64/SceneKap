@@ -1,4 +1,4 @@
-@(nForm: Form[CreateNearbyForm])(detForm: Form[GetDetailsForm])(urlForm: Form[ChangeURLForm])(photoForm: Form[AddPhotoForm])(postCommentForm: Form[PostCommentForm])(voteCommentForm: Form[VoteCommentForm])(addUserForm: Form[AddUserForm])(loginForm: Form[LoginForm])(changeScoreForm: Form[ChangeScoreForm])(implicit messages: Messages)
+@(nForm: Form[CreateNearbyForm])(detForm: Form[GetDetailsForm])(urlForm: Form[ChangeURLForm])(photoForm: Form[AddPhotoForm])(postCommentForm: Form[PostCommentForm])(voteCommentForm: Form[VoteCommentForm])(addUserForm: Form[AddUserForm])(loginForm: Form[LoginForm])(changeScoreForm: Form[ChangeScoreForm])(changePasswordForm: Form[ChangePasswordForm])(forgotPasswordForm: Form[ForgotPasswordForm])(implicit messages: Messages)
 
 @import helper._
 
@@ -166,6 +166,35 @@
 
                         <div class="buttons">
                             <input type="submit" value="Change Score"/>
+                        </div>
+                    }
+                    <br>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div align="center">
+                <div class="six columns">
+                    @form(routes.UserController.changePasswordBtn()) {
+                        @inputText(changePasswordForm("Username"))
+                        @inputText(changePasswordForm("OldPassword"))
+                        @inputText(changePasswordForm("NewPassword"))
+
+                        <div class="buttons">
+                            <input type="submit" value="Change Password"/>
+                        </div>
+                    }
+                    <br>
+                </div>
+
+                <div class="six columns">
+                    @form(routes.UserController.forgotPasswordBtn()) {
+                        @inputText(forgotPasswordForm("Username"))
+                        @inputText(forgotPasswordForm("Email"))
+
+                        <div class="buttons">
+                            <input type="submit" value="Forgot Password"/>
                         </div>
                     }
                     <br>
