@@ -1,0 +1,25 @@
+@(fpForm: Form[ResetPasswordForm])(msg: String)(impKey: String)(implicit messages: Messages)
+
+@import helper._
+
+@main("SceneKap") {
+    <ul id="forms"></ul>
+
+    <div align="center">
+        <div class="title">
+            <b>SceneKap Password Reset</b>
+        </div>
+        @msg
+    </div>
+
+    <div align="center">
+        @form(routes.UserController.resetPasswordBtn(impKey)) {
+            @inputText(fpForm("Username"))
+            @inputText(fpForm("New Password"))
+
+            <div class="buttons">
+                <input class="button-primary" type="submit" value="Reset Password">
+            </div>
+        }
+    </div>
+}

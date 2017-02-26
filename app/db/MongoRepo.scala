@@ -21,8 +21,9 @@ import scala.collection.JavaConversions._
 import async.calcUrlSumAndScore
 import async.detCommentProfanity
 import com.mongodb.client.result.UpdateResult
-
 import courier._
+
+import scala.util.Random
 
 @Singleton
 class MongoRepo @Inject()(implicit ec: ExecutionContext) {
@@ -48,6 +49,8 @@ class MongoRepo @Inject()(implicit ec: ExecutionContext) {
 
   val PASSWORD_EMAILER_ADDRESS: String = appConf.getString("password.emailerAddress")
   val PASSWORD_EMAILER_PASSWORD: String = appConf.getString("password.emailerPassword")
+
+  val BASE_URL: String = appConf.getString("url.baseUrl")
 
   val strConf: String = "mongodb://localhost/?connectTimeoutMS=" + MONGO_CONNECT_TIMEOUT + "&socketTimeoutMS=" + MONGO_SOCKET_TIMEOUT + "&serverSelectionTimeoutMS=" + MONGO_SERVER_SELECTION_TIMEOUT
   val mongoClient: MongoClient = MongoClient(strConf)
@@ -379,7 +382,9 @@ class MongoRepo @Inject()(implicit ec: ExecutionContext) {
   def forgotPassword(username: String, email: String): Future[Int] = {
     for {
       res <- usersCollection.find(and(equal("username", username), equal("email", email))).first.toFuture
-      finalRes <- if(res.isEmpty) Future{-1} else {
+      key <- if(res.nonEmpty) Future{Random.alphanumeric.take(12).mkString} else Future{""}
+      setKey <- usersCollection.updateOne(and(equal("username", username), equal("email", email)), combine(set("key", key), set("fpDate", (System.currentTimeMillis / 1000).toString))).toFuture
+      finalRes <- if(key.isEmpty) Future{-1} else if(!setKey.head.wasAcknowledged) Future{0} else {
         val mailer = Mailer("smtp.gmail.com", 587)
           .auth(true)
           .as(PASSWORD_EMAILER_ADDRESS, PASSWORD_EMAILER_PASSWORD)
@@ -387,14 +392,38 @@ class MongoRepo @Inject()(implicit ec: ExecutionContext) {
 
         val passwordRaw = res.head.getString("password")
         val password = if(passwordRaw == null) "" else passwordRaw
+        val url = BASE_URL + "/rpass/" + key
         val fut = mailer(Envelope.from(PASSWORD_EMAILER_ADDRESS.addr)
           .to(email.addr)
           .subject("SceneKap Forgotten Password")
-          .content(Text("Dear User, \n\nScroll down to see your login password for SceneKap.\n\nRegards,\nThe SceneKap Team" + "" +
-            "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n" + password + "\n\n\n\n")))
+          .content(Multipart().html("<p>Dear SceneKap User, <br> <br> Click this link to reset your password: <a href=\"" + url + "\">" + url + "</a>.<br>For security purposes, " +
+            "the link will only be usable once and will expire in five minutes.<br><br>Sincerely,<br>The SceneKap Team</p>")))
 
         Future{1}
       }
+    } yield finalRes
+  }
+
+  def resetPassword(username: String, newPassword: String, key: String): Future[Int] = {
+    for {
+      user <- usersCollection.find(equal("username", username)).first.toFuture
+      userFound <- if(user.isEmpty) Future{false} else Future{true}
+      doReset <- {
+        if(!userFound) Future {false}
+        else {
+          val uKeyRaw = user.head.getString("key")
+          val uKey = if(uKeyRaw == null) "" else uKeyRaw
+          val cpDateRaw = user.head.getString("fpDate")
+          val cpDate = if(cpDateRaw == null) 0 else cpDateRaw.toLong
+          val curDate: Long = System.currentTimeMillis / 1000
+
+          if(uKey.nonEmpty && key == uKey && curDate - cpDate <= 300) Future{true} else Future{false}
+        }
+      }
+      res <-
+        if(doReset) usersCollection.updateOne(equal("username", username), combine(set("password", newPassword), set("fpDate", "0"))).toFuture
+        else Future{Seq[UpdateResult](UpdateResult.unacknowledged())}
+      finalRes <- if(!userFound) Future{-2} else if(!doReset) Future{-1} else if(res.head.wasAcknowledged) Future{1} else Future{0}
     } yield finalRes
   }
 }

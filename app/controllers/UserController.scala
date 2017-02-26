@@ -3,13 +3,15 @@ package controllers
 import play.api.mvc._
 import play.api.i18n._
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 import javax.inject._
 
 import com.typesafe.config.ConfigFactory
 import db.MongoRepo
 import models.User
 import play.api.libs.json.{JsValue, Json, Writes}
+
+import scala.util.matching.Regex
 
 /**
   * Created by NoahKaplan on 10/25/16.
@@ -100,6 +102,10 @@ class UserController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
     }
   }
 
+  def resetPassword(key: String) = Action {
+    Ok(views.html.cpass(resetPasswordForm)("")(key))
+  }
+
   def getCutoffs = Action {
     Ok(getRankCutoffs)
   }
@@ -107,7 +113,7 @@ class UserController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
   def addUserBtn = Action.async { implicit request =>
     addUserForm.bindFromRequest.fold(
       errorForm => {
-        repo.list().map { _ =>
+        Future {
           Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(errorForm)(loginForm)(changeScoreForm)(changePasswordForm)(forgotPasswordForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
@@ -126,7 +132,7 @@ class UserController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
   def firstLoginBtn = Action.async { implicit request =>
     loginForm.bindFromRequest.fold(
       errorForm => {
-        repo.list().map { _ =>
+        Future {
           Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(errorForm)(changeScoreForm)(changePasswordForm)(forgotPasswordForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
@@ -145,7 +151,7 @@ class UserController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
   def regLoginBtn = Action.async { implicit request =>
     loginForm.bindFromRequest.fold(
       errorForm => {
-        repo.list().map { _ =>
+        Future {
           Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(errorForm)(changeScoreForm)(changePasswordForm)(forgotPasswordForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
@@ -164,7 +170,7 @@ class UserController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
   def changeScoreBtn = Action.async { implicit request =>
     changeScoreForm.bindFromRequest.fold(
       errorForm => {
-        repo.list().map { _ =>
+        Future {
           Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(errorForm)(changePasswordForm)(forgotPasswordForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
@@ -183,7 +189,7 @@ class UserController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
   def changePasswordBtn = Action.async { implicit request =>
     changePasswordForm.bindFromRequest.fold(
       errorForm => {
-        repo.list().map { _ =>
+        Future {
           Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm)(errorForm)(forgotPasswordForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
@@ -202,7 +208,7 @@ class UserController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
   def forgotPasswordBtn = Action.async { implicit request =>
     forgotPasswordForm.bindFromRequest.fold(
       errorForm => {
-        repo.list().map { _ =>
+        Future {
           Ok(views.html.index(llForm)(detForm)(changeURLForm)(addPhotoForm)(postCommentForm)(voteCommentForm)(addUserForm)(loginForm)(changeScoreForm)(changePasswordForm)(errorForm))
         } recover {
           case _ => ServiceUnavailable("Database query failed")
@@ -213,6 +219,39 @@ class UserController @Inject() (repo: MongoRepo, val messagesApi: MessagesApi)
           Ok(res.toString)
         } recover {
           case _ => ServiceUnavailable("Database query failed")
+        }
+      }
+    )
+  }
+
+  def resetPasswordBtn(key: String) = Action.async { implicit request =>
+    resetPasswordForm.bindFromRequest.fold(
+      errorForm => {
+        Future{Ok(views.html.cpass(resetPasswordForm)("There was an unexpected error. Please try again.")(key))}
+      },
+      p => {
+        def isAllDigits(x: String) = x forall Character.isDigit
+
+        val (username, newPassword) = (p.username, p.newPassword)
+        val numPattern: Regex = "[0-9]+".r
+        val containsNumOpt: Option[String] = numPattern.findFirstIn(newPassword)
+        val containsNumBool = containsNumOpt match {
+          case Some(_) => true
+          case None => false
+        }
+
+        if(newPassword.length < 8 || newPassword.toLowerCase == newPassword || !containsNumBool) {
+          Future{Ok(views.html.cpass(resetPasswordForm)("Your password was too simple! Please enter a password with at least 8 characters, one upper case character, and one number.")(key))}
+        }
+        else {
+          repo.resetPassword(username, newPassword, key).map { res =>
+            val msg = if(res == -2) "The user you input does not exist!"
+              else if(res == -1) "This link is not currently valid for the user you input! To get a new valid link sent, press the mobile app's \"Forgot My Password\" button again for this user."
+              else if (res == 1) "Success!" else "There was an error. Check your connection and try again."
+            Ok(views.html.cpass(resetPasswordForm)(msg)(key))
+          } recover {
+            case _ => Ok(views.html.cpass(resetPasswordForm)("There was an error. Check your connection and try again.")(key))
+          }
         }
       }
     )
