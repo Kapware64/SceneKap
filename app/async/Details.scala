@@ -1,5 +1,7 @@
 package async
 
+import java.net.URL
+
 import scala.concurrent.{ExecutionContext, Future}
 import play.api.libs.json._
 import db.MongoRepo
@@ -30,12 +32,15 @@ class Details(ecp: ExecutionContext, repo: MongoRepo) {
       val json: JsValue = Json.parse(raw)
 
       json \ "result" \ "website" match {
-        case (JsDefined(JsString(s))) => s
+        case (JsDefined(JsString(s))) =>
+          val urlObj: URL = new URL(s)
+          urlObj.toString
         case _ => ""
       }
     } catch {
       case ioe: java.io.IOException =>  ""
       case ste: java.net.SocketTimeoutException => ""
+      case mue: java.net.MalformedURLException => ""
     }
   }
 

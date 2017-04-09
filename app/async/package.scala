@@ -81,10 +81,9 @@ package object async {
     }
 
     val placeWords = remEmptyWords(placeKeywords.split("\\s+").toList, EMPTY_KEYWORDS, List[String]())
-    val numPlaceWords = placeWords.size
     val sumWords = sum.split("\\s+").toList
     if(calcMatchingWords(ZERO_KEYWORDS, sumWords, 0, 1) <= 0) {
-      val aboutScore = if(about) calcMatchingWords(ABOUT_KEYWORDS, sumWords, 0, numPlaceWords / 2) else 0
+      val aboutScore = if(about) calcMatchingWords(ABOUT_KEYWORDS, sumWords, 0, 2) else 0
       calcMatchingWords(placeWords, sum.split("\\s+").toList, 0, 1) + aboutScore
     }
     else 0

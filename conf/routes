@@ -24,12 +24,6 @@ POST    /changeScore/:username/:voteVal                     controllers.UserCont
 POST    /changePassword/:username/:oldPass/:newPass         controllers.UserController.changePassword(username, oldPass, newPass)
 POST    /forgotPassword/:username/:email                    controllers.UserController.forgotPassword(username, email)
 
-#change into getDetails, which also returns comments
-#post for a pid's comments (new comment and upvote/downvote)
-#post for pic
-#post for website
-#post for summary
-
 POST    /nearby                     controllers.PlaceController.nearbyBtn
 POST    /details                    controllers.PlaceController.detailsBtn
 POST    /changeUrl                  controllers.PlaceController.urlBtn

@@ -220,11 +220,14 @@ class MongoRepo @Inject()(implicit ec: ExecutionContext) {
       baseUrl <- {
         try {
           val urlObj: URL = new URL(url)
-          Future{urlObj.getProtocol + "://" + urlObj.getHost}
+          println("URL: " + urlObj.toString)
+          Future{urlObj.toString}
         } catch { case e: java.net.MalformedURLException => Future{""}}
       }
-      (_, score) <- if(baseUrl.isEmpty) Future{("", 0)} else calcUrlSumAndScore(placeKeywords, baseUrl, false, false)
+      (summary, score) <- if(baseUrl.isEmpty) Future{("", 0)} else calcUrlSumAndScore(placeKeywords, baseUrl, false, false)
       upsertRes <- {
+        println("SCORE: " + score)
+        println("SUMMARY: " + summary)
         if(score < MIN_SUM_SCORE) Future{Seq[UpdateResult](UpdateResult.unacknowledged())}
         else placesCollection.updateOne(equal("pid", pid), combine(set("website", url), set("last_summary_mod", "0")), upst).toFuture
       }
