@@ -3,7 +3,7 @@ Places Platform API
 
 This is the RESTful API for a places platform.
 
-The project was initially the backend for a mobile places app (originally called SceneKap), but after development was halted, it has been released as open source. It utilizes the Play Framework, Scala, HTML, CSS, and MongoDB.
+The project was initially the backend for a mobile places app (originally called SceneKap), but was later converted to an open source project. It utilizes the Play Framework, Scala, HTML, CSS, and MongoDB.
 
 The project comes included with an interface allowing easy manipulation of the API for testing purposes via a web browser.
 
@@ -53,6 +53,6 @@ This platform has the following features and more:
 * Website
     * Generate website summary
 
-All place data is initially pulled from Google's Places API and is cached when possible to reduce the number of calls to Google's Places API. Whenever a piece of user-entered data can replace a piece of data from Google's Places API (this is determined by the relevancy of the user-entered data and its the upvote/downvote history), then it will always be used in place of calling Google's Place API for that item of data.
+All place data is initially pulled from Google's Places API and is cached when possible to reduce the number of calls to Google's Places API. Whenever a piece of user-entered data can replace a piece of data from Google's Places API (this is determined by the relevancy of the user-entered data and its upvote/downvote history), then it will always be used in place of calling Google's Place API for that item of data.
 
-Another feature of this platform is its place summary generation. The platform maintains updated summaries of each place by utilizing its website summarization tool and places' websites. Using a list of "stop words", "bad words", and "filler" words to direct its summary decision making, the platform ensures the summary of each place stays relevant.
+Another feature of this platform is its place summary generation. The platform maintains updated summaries of each place by utilizing its website summarization tool and places' websites. Using a list of "stop words", "bad words", and "filler words" to direct its summary decision making, the platform ensures the summary of each place stays relevant.
