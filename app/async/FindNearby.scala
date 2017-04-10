@@ -12,6 +12,7 @@ import play.api.libs.json._
 class FindNearby(ecp: ExecutionContext, repo: MongoRepo) {
   implicit val ec = ecp
 
+  //pid, name, lat, long, vicinity, photo_uri, viewport
   type NearbyElem = (String, String, String, String, String, String, String)
 
   implicit val nearbyElemDetWrites = new Writes[NearbyElem] {

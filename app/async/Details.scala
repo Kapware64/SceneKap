@@ -13,6 +13,7 @@ import models.Place
 class Details(ecp: ExecutionContext, repo: MongoRepo) {
   implicit val ec = ecp
 
+  //returns website, summary, last summary mod date, recent comments, top comments, recent photos, top photos
   private def getDBInfo(pid: String): Future[(String, String, String, String, String, String, String)] = {
     def procRes(res: Option[Place]): (String, String, String, String, String, String, String) = {
       res match {
